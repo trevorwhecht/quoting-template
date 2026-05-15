@@ -10,6 +10,16 @@
 
 **This is Plan 1 of 3.** Plan 2 covers the full dashboard. Plan 3 covers Get Quote and Account pages.
 
+---
+
+> **Schema updates applied 2026-05-14** (post-review against Postgres best practices):
+> - All money/price/cost fields changed from `Float` → `Decimal @db.Decimal(10,2)` to prevent floating-point rounding errors in financial calculations. `rushFeePercent` uses `@db.Decimal(5,4)`.
+> - FK indexes added: `Order [userId]`, `Order [stateId]`, `Order [userId, createdAt]`, `OrderLineItem [orderId]`, `Payment [orderId]`, `Address [userId]`, `Account [userId]`, `Session [userId]`.
+> - Seed script now resets the `OrderState` autoincrement sequence after seeding to prevent PK conflicts when admins add new states via UI.
+> - Tailwind 4 CSS variable syntax standardized: `text-(--color-danger)` not `text-(--color-danger)` throughout all TSX code blocks.
+>
+> **The actual `prisma/schema.prisma` file reflects all schema changes.** The schema code block in Task 3 below is kept for reference — use the real file when running migrations.
+
 **Spec:** `docs/superpowers/specs/2026-05-14-quoting-template-design.md`
 
 ---
@@ -85,7 +95,7 @@ Replace the `scripts` block and add the `prisma` seed config:
     "dev:prod": "dotenv -e .env.prod -- next dev --port 3001",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -143,6 +153,12 @@ NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 SEED_ADMIN_EMAIL=
 SEED_ADMIN_PASSWORD=
+NEXT_PUBLIC_BASE_URL=       # required — base URL for Order.token public share links
+CLOUDINARY_URL=             # optional — image uploads (order mainImage, quote attachments)
+RESEND_API_KEY=             # optional — transactional email (state changes, quote ready)
+TWILIO_ACCOUNT_SID=         # optional — SMS notifications
+TWILIO_AUTH_TOKEN=          # optional — SMS notifications
+TWILIO_PHONE_NUMBER=        # optional — SMS from number
 ```
 
 ---
@@ -174,8 +190,7 @@ model User {
   lastName    String
   companyName String?
   phone       String?
-  role        String   @default("user") // 'admin' | 'employee' | 'user'
-  addressId   String?
+  role        String   @default("user") // 'guest' | 'user' | 'employee' | 'admin'
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdBy   String?
@@ -184,13 +199,15 @@ model User {
   accounts      Account[]
   sessions      Session[]
   orders        Order[]
-  notifications Notification[]
   payments      Payment[]
-  address       Address? @relation(fields: [addressId], references: [id])
+  addresses     Address[]
+  notifications Notification[]
 }
 
 model Address {
   id        String   @id @default(cuid())
+  userId    String?
+  label     String?  // 'home' | 'billing' | 'shipping' | etc.
   street    String
   city      String
   state     String
@@ -200,7 +217,9 @@ model Address {
   updatedAt DateTime @updatedAt
   createdBy String?
   updatedBy String?
-  users     User[]
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders Order[] @relation("ShippingAddress")
 }
 
 model OrderState {
@@ -217,10 +236,11 @@ model OrderState {
 }
 
 model Order {
-  id              Int       @id @default(autoincrement())
-  userId          String?   // null = admin-created with no linked account
-  stateId         Int
-  nickname        String?
+  id                Int       @id @default(autoincrement())
+  userId            String?   // null = admin "no account yet" orders only
+  stateId           Int
+  shippingAddressId String?
+  nickname          String?
   customerNotes   String?   // from the Get Quote form, visible to customer
   notes           String?   // internal admin notes, never shown to customer
   totalQty        Int       @default(0)
@@ -255,12 +275,13 @@ model Order {
   createdBy       String?
   updatedBy       String?
 
-  state          OrderState      @relation(fields: [stateId], references: [id])
-  user           User?           @relation(fields: [userId], references: [id])
-  orderLineItems OrderLineItem[]
-  setUpCosts     SetUpCost[]
-  payments       Payment[]
-  notifications  Notification[]
+  state           OrderState      @relation(fields: [stateId], references: [id])
+  user            User?           @relation(fields: [userId], references: [id])
+  shippingAddress Address?        @relation("ShippingAddress", fields: [shippingAddressId], references: [id])
+  orderLineItems  OrderLineItem[]
+  setUpCosts      SetUpCost[]
+  payments        Payment[]
+  notifications   Notification[]
 }
 
 model OrderLineItem {
@@ -271,20 +292,21 @@ model OrderLineItem {
   unitPrice   Float    @default(0)
   lineTotal   Float    @default(0) // unitPrice * qty
   unitCost    Float    @default(0) // admin COGS per unit (admin only)
+  sortOrder   Int      @default(0)
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdBy   String?
   updatedBy   String?
 
-  order Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  sizes OrderLineItemSize[]
+  order    Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variants OrderLineItemVariant[]
 }
 
-model OrderLineItemSize {
+model OrderLineItemVariant {
   id              Int      @id @default(autoincrement())
   orderLineItemId Int
-  size            String
+  variant         String   // size, color, SKU, config — anything that creates a sub-qty
   qty             Int
   price           Float
   cost            Float?
@@ -315,6 +337,7 @@ model Payment {
   amount    Float
   channel   String   // 'zelle' | 'stripe' | 'cash' | 'check' | 'other'
   note      String?
+  paidAt    DateTime @default(now())
   createdAt DateTime @default(now())
   createdBy String?
 
@@ -420,7 +443,7 @@ Expected: migration file created in `prisma/migrations/`, DB tables created, Pri
 npx prisma studio
 ```
 
-Open `http://localhost:5555`. Confirm all tables are present: User, Order, OrderState, OrderLineItem, OrderLineItemSize, SetUpCost, Payment, Notification, MonthlyExpense, UniversalSettings, Account, Session, VerificationToken.
+Open `http://localhost:5555`. Confirm all tables are present: User, Address, Order, OrderState, OrderLineItem, OrderLineItemVariant, SetUpCost, Payment, Notification, MonthlyExpense, UniversalSettings, Account, Session, VerificationToken.
 
 Close Studio when done (Ctrl+C).
 
@@ -466,6 +489,11 @@ async function main() {
       create: state,
     })
   }
+
+  // Reset sequence so the next auto-generated OrderState ID doesn't conflict
+  // with the explicitly-seeded IDs 0–6. Without this, nextval() returns 1 and
+  // fails with a unique constraint violation on the first admin-created state.
+  await prisma.$executeRaw`SELECT setval(pg_get_serial_sequence('"OrderState"', 'id'), (SELECT MAX(id) FROM "OrderState") + 1)`
 
   console.log("Seeding universal settings...")
   for (const s of SETTINGS) {
@@ -904,7 +932,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col bg-[var(--color-background)] text-[var(--color-foreground)] antialiased">
+      <body className="min-h-screen flex flex-col bg-(--color-background) text-(--color-foreground) antialiased">
         <SessionWrapper>
           <Navbar />
           <main className="flex-1">{children}</main>
@@ -948,7 +976,7 @@ export default function NavbarLinks() {
     <>
       <Link
         href="/get-quote"
-        className="text-sm font-medium text-[var(--color-foreground)] hover:text-[var(--color-primary)] transition-colors motion-reduce:transition-none"
+        className="text-sm font-medium text-(--color-foreground) hover:text-(--color-primary) transition-colors motion-reduce:transition-none"
         onClick={() => setOpen(false)}
       >
         Get Quote
@@ -957,7 +985,7 @@ export default function NavbarLinks() {
       {isStaff && (
         <Link
           href="/dashboard"
-          className="text-sm font-medium text-[var(--color-foreground)] hover:text-[var(--color-primary)] transition-colors motion-reduce:transition-none"
+          className="text-sm font-medium text-(--color-foreground) hover:text-(--color-primary) transition-colors motion-reduce:transition-none"
           onClick={() => setOpen(false)}
         >
           Dashboard
@@ -967,7 +995,7 @@ export default function NavbarLinks() {
       {session && !isStaff && (
         <Link
           href="/account"
-          className="text-sm font-medium text-[var(--color-foreground)] hover:text-[var(--color-primary)] transition-colors motion-reduce:transition-none"
+          className="text-sm font-medium text-(--color-foreground) hover:text-(--color-primary) transition-colors motion-reduce:transition-none"
           onClick={() => setOpen(false)}
         >
           My Orders
@@ -997,7 +1025,7 @@ export default function NavbarLinks() {
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden min-h-11 min-w-11 flex items-center justify-center rounded-md text-[var(--color-foreground)] hover:bg-[var(--color-surface)] transition-colors motion-reduce:transition-none touch-manipulation"
+        className="md:hidden min-h-11 min-w-11 flex items-center justify-center rounded-md text-(--color-foreground) hover:bg-(--color-surface) transition-colors motion-reduce:transition-none touch-manipulation"
         onClick={() => setOpen(prev => !prev)}
         aria-label="Toggle navigation"
       >
@@ -1006,7 +1034,7 @@ export default function NavbarLinks() {
 
       {/* Mobile dropdown */}
       {open ? (
-        <div className="absolute top-full left-0 right-0 bg-[var(--color-background)] border-b border-[var(--color-border)] flex flex-col gap-4 px-6 py-4 md:hidden z-50">
+        <div className="absolute top-full left-0 right-0 bg-(--color-background) border-b border-(--color-border) flex flex-col gap-4 px-6 py-4 md:hidden z-50">
           {links}
         </div>
       ) : null}
@@ -1025,11 +1053,11 @@ import NavbarLinks from "./Navbar-Links"
 
 export default function Navbar() {
   return (
-    <header className="relative border-b border-[var(--color-border)] bg-[var(--color-background)]">
+    <header className="relative border-b border-(--color-border) bg-(--color-background)">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <Link
           href="/"
-          className="font-semibold text-[var(--color-foreground)] text-lg tracking-tight"
+          className="font-semibold text-(--color-foreground) text-lg tracking-tight"
         >
           QuotingApp
         </Link>
@@ -1124,15 +1152,15 @@ export default function Login() {
               <Input id="password" name="password" type="password" autoComplete="current-password" required className="text-base" />
             </div>
             {error && (
-              <p className="text-sm text-[var(--color-danger)]" role="alert">{error}</p>
+              <p className="text-sm text-(--color-danger)" role="alert">{error}</p>
             )}
             <Button type="submit" className="w-full touch-manipulation" disabled={loading}>
               {loading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
+          <p className="mt-4 text-center text-sm text-(--color-muted)">
             No account?{" "}
-            <Link href="/register" className="text-[var(--color-primary)] hover:underline">
+            <Link href="/register" className="text-(--color-primary) hover:underline">
               Register
             </Link>
           </p>
@@ -1260,23 +1288,23 @@ export default function Register() {
               <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="text-base" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone <span className="text-[var(--color-muted)]">(optional)</span></Label>
+              <Label htmlFor="phone">Phone <span className="text-(--color-muted)">(optional)</span></Label>
               <Input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" className="text-base" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="companyName">Company <span className="text-[var(--color-muted)]">(optional)</span></Label>
+              <Label htmlFor="companyName">Company <span className="text-(--color-muted)">(optional)</span></Label>
               <Input id="companyName" name="companyName" autoComplete="organization" className="text-base" />
             </div>
             {error && (
-              <p className="text-sm text-[var(--color-danger)]" role="alert">{error}</p>
+              <p className="text-sm text-(--color-danger)" role="alert">{error}</p>
             )}
             <Button type="submit" className="w-full touch-manipulation" disabled={loading}>
               {loading ? "Creating account…" : "Create Account"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
+          <p className="mt-4 text-center text-sm text-(--color-muted)">
             Already have an account?{" "}
-            <Link href="/login" className="text-[var(--color-primary)] hover:underline">
+            <Link href="/login" className="text-(--color-primary) hover:underline">
               Sign In
             </Link>
           </p>
@@ -1306,10 +1334,10 @@ import { Button } from "@/components/ui/button"
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-3.5rem)] px-4 text-center">
-      <h1 className="text-4xl font-bold tracking-tight text-[var(--color-foreground)] mb-4">
+      <h1 className="text-4xl font-bold tracking-tight text-(--color-foreground) mb-4">
         Welcome
       </h1>
-      <p className="text-lg text-[var(--color-muted)] mb-8 max-w-md">
+      <p className="text-lg text-(--color-muted) mb-8 max-w-md">
         Get a quote for your project or sign in to manage your orders.
       </p>
       <div className="flex gap-4 flex-col sm:flex-row">
@@ -1333,8 +1361,8 @@ Create `src/app/dashboard/page.tsx`:
 export default function DashboardPage() {
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-[var(--color-foreground)]">Dashboard</h1>
-      <p className="text-[var(--color-muted)] mt-2">Plan 2 will build this out.</p>
+      <h1 className="text-2xl font-bold text-(--color-foreground)">Dashboard</h1>
+      <p className="text-(--color-muted) mt-2">Plan 2 will build this out.</p>
     </div>
   )
 }
