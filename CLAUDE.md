@@ -32,5 +32,7 @@ npx prisma db seed  # seeds admin user, 7 OrderStates, UniversalSettings
 **Template rules:**
 - All code stays under `src/` — non-negotiable
 - CSS variables in `globals.css` — no raw Tailwind palette classes in components
+- Tailwind 4 CSS variable syntax: `text-(--color-danger)` not `text-[var(--color-danger)]`
+- Z-index scale: z-20 dropdowns · z-40 modals · z-50 nav overlays · z-[100] toasts
 - No domain logic in `components/ui/` or `components/layout/`
 - Never modify `schema.prisma` without explicit instruction

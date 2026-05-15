@@ -775,6 +775,8 @@ Replace the entire contents of `src/app/globals.css`:
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+
   /* Brand */
   --color-primary: #111827;
   --color-primary-foreground: #ffffff;
@@ -843,6 +845,17 @@ body {
 * {
   border-color: var(--color-border);
 }
+
+button, a {
+  touch-action: manipulation; /* removes 300ms tap delay on mobile */
+}
+
+/* Z-index scale — use only these values, never arbitrary numbers */
+/* z-10  — sticky elements, floating labels                        */
+/* z-20  — dropdowns, popovers                                     */
+/* z-40  — modals, dialogs                                         */
+/* z-50  — nav overlays                                            */
+/* z-[100] — toasts, notifications                                 */
 ```
 
 ---
@@ -870,7 +883,7 @@ export default function SessionWrapper({ children }: { children: React.ReactNode
 - [ ] **Step 2: Replace src/app/layout.tsx**
 
 ```tsx
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import SessionWrapper from "@/components/shared/layout/SessionWrapper"
 import Navbar from "@/components/shared/layout/Navbar"
@@ -879,6 +892,13 @@ import { Toaster } from "@/components/ui/sonner"
 export const metadata: Metadata = {
   title: "Quoting Template",
   description: "Order and quote management",
+}
+
+// Required for env(safe-area-inset-bottom) to work on iOS — dialogs and sheets need this
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -977,19 +997,19 @@ export default function NavbarLinks() {
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden p-2 text-[var(--color-foreground)]"
-        onClick={() => setOpen(!open)}
+        className="md:hidden min-h-11 min-w-11 flex items-center justify-center rounded-md text-[var(--color-foreground)] hover:bg-[var(--color-surface)] transition-colors motion-reduce:transition-none touch-manipulation"
+        onClick={() => setOpen(prev => !prev)}
         aria-label="Toggle navigation"
       >
         {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       {/* Mobile dropdown */}
-      {open && (
+      {open ? (
         <div className="absolute top-full left-0 right-0 bg-[var(--color-background)] border-b border-[var(--color-border)] flex flex-col gap-4 px-6 py-4 md:hidden z-50">
           {links}
         </div>
-      )}
+      ) : null}
     </>
   )
 }
@@ -1049,9 +1069,8 @@ Create `src/app/(auth)/login/Login.tsx`:
 
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1060,10 +1079,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 export default function Login() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
+    setError(null)
     const form = new FormData(e.currentTarget)
 
     const result = await signIn("credentials", {
@@ -1075,7 +1097,8 @@ export default function Login() {
     setLoading(false)
 
     if (result?.error) {
-      toast.error("Invalid email or password")
+      setError("Invalid email or password — try again or contact support.")
+      emailRef.current?.focus()
       return
     }
 
@@ -1084,7 +1107,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-4">
+    <div className="min-h-[calc(100dvh-3.5rem)] flex items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign In</CardTitle>
@@ -1094,13 +1117,16 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
+              <Input ref={emailRef} id="email" name="email" type="email" inputMode="email" autoComplete="email" required className="text-base" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" autoComplete="current-password" required />
+              <Input id="password" name="password" type="password" autoComplete="current-password" required className="text-base" />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            {error && (
+              <p className="text-sm text-[var(--color-danger)]" role="alert">{error}</p>
+            )}
+            <Button type="submit" className="w-full touch-manipulation" disabled={loading}>
               {loading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
@@ -1146,9 +1172,8 @@ Create `src/app/(auth)/register/Register.tsx`:
 
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1157,10 +1182,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 export default function Register() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
+    setError(null)
     const form = new FormData(e.currentTarget)
 
     const res = await fetch("/api/users", {
@@ -1180,7 +1208,8 @@ export default function Register() {
 
     if (json.error) {
       setLoading(false)
-      toast.error(json.error)
+      setError(json.error)
+      emailRef.current?.focus()
       return
     }
 
@@ -1194,7 +1223,7 @@ export default function Register() {
     setLoading(false)
 
     if (result?.error) {
-      toast.error("Account created but sign-in failed — please sign in manually")
+      setError("Account created but sign-in failed — please sign in manually.")
       router.push("/login")
       return
     }
@@ -1204,7 +1233,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-4 py-8">
+    <div className="min-h-[calc(100dvh-3.5rem)] flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Create Account</CardTitle>
@@ -1215,30 +1244,33 @@ export default function Register() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" name="firstName" required />
+                <Input id="firstName" name="firstName" autoComplete="given-name" required className="text-base" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" name="lastName" required />
+                <Input id="lastName" name="lastName" autoComplete="family-name" required className="text-base" />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
+              <Input ref={emailRef} id="email" name="email" type="email" inputMode="email" autoComplete="email" required className="text-base" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} />
+              <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="text-base" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone <span className="text-[var(--color-muted)]">(optional)</span></Label>
-              <Input id="phone" name="phone" type="tel" />
+              <Input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" className="text-base" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyName">Company <span className="text-[var(--color-muted)]">(optional)</span></Label>
-              <Input id="companyName" name="companyName" />
+              <Input id="companyName" name="companyName" autoComplete="organization" className="text-base" />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            {error && (
+              <p className="text-sm text-[var(--color-danger)]" role="alert">{error}</p>
+            )}
+            <Button type="submit" className="w-full touch-manipulation" disabled={loading}>
               {loading ? "Creating account…" : "Create Account"}
             </Button>
           </form>
@@ -1273,7 +1305,7 @@ import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)] px-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-3.5rem)] px-4 text-center">
       <h1 className="text-4xl font-bold tracking-tight text-[var(--color-foreground)] mb-4">
         Welcome
       </h1>
@@ -1350,3 +1382,61 @@ npm run dev
 - [x] Navbar is server component; NavbarLinks is the only client boundary
 - [x] SessionWrapper isolates `"use client"` for SessionProvider
 - [x] `src/lib/prisma.ts` uses singleton pattern for dev hot-reload safety
+
+---
+
+## UI Requirements for Plan 2 (Dashboard)
+
+These requirements must be applied when writing Plan 2. They are listed here so nothing is missed.
+
+**Tables (kanban list, orders table):**
+- Always wrap `<Table>` in `<div className="w-full overflow-x-auto">`
+- Set `min-w-[Npx]` on the table (≈120px × column count)
+- `whitespace-nowrap` on cells with names, dates, IDs, status badges
+
+**Large lists:**
+- If orders list exceeds 50 items, virtualize with `@tanstack/react-virtual` — install it in Plan 2 Task 1
+
+**Dialog / Sheet footers:**
+- Every `<DialogFooter>` and `<SheetFooter>` with action buttons needs `pb-[max(1rem,env(safe-area-inset-bottom))]`
+- Full-screen sheets use `h-dvh overflow-y-auto` (never `h-screen`)
+
+**Icon-only buttons (order card actions, sidebar toggles):**
+- Every icon-only `<Button>` must have `aria-label`
+
+**Order state colors:**
+- Never use color alone to convey state — pair the colored badge with the state name text
+- Kanban column headers: colored left border or header bg + text label, not color alone
+
+**Kanban / dashboard container:**
+- Use `min-h-dvh` on the page wrapper, not `min-h-screen`
+- Kanban columns must be independently scrollable on mobile — `overflow-y-auto` per column, not on the page
+
+**Hover-only actions:**
+- Any button that appears on card hover must use `sm:opacity-0 sm:group-hover:opacity-100` so it's always visible on touch devices
+
+---
+
+## Performance & Composition Requirements for Plan 2 (Dashboard)
+
+### Data Fetching (CRITICAL)
+- **Parallelize dashboard fetches** — use `Promise.all()` for independent queries (orders + order states + settings). Never await them sequentially.
+- **`React.cache()`** — wrap any server-side fetch helper in `React.cache()` so the same data isn't fetched twice during a single render pass (e.g., if two components both need `getOrderStates()`).
+- **Start promises early, await late** — in API route handlers, kick off all DB queries before the first `await`.
+
+### Bundle Size (CRITICAL)
+- **`next/dynamic` for Recharts** — chart components are heavy. Import them with `next/dynamic({ ssr: false })` so they don't bloat the initial bundle. Insights view only.
+- **Direct imports** — never import from barrel files. Always `import { Button } from "@/components/ui/button"`, never `import * from "@/components/ui"`.
+
+### Re-render Optimization (MEDIUM)
+- **`useTransition` for order state changes** — when moving an order to the next state, wrap the mutation in `startTransition` instead of a `loading` boolean. This keeps the UI responsive while the update is in flight.
+- **`rerender-no-inline-components`** — never define a component function inside another component. Extract it above or into its own file.
+- **Primitive effect dependencies** — use `order.id` not the full `order` object as an effect dependency to avoid spurious re-renders.
+
+### Component Architecture (MEDIUM)
+- **React 19 refs** — the stack is React 19.2.4. When writing custom shared components that accept a `ref`, pass it as a plain prop — no `forwardRef` wrapper needed.
+- **Compound components for order cards** — the order card has distinct parts (header, state badge, actions). Structure it as a compound component with sub-components (`OrderCard.Header`, `OrderCard.Badge`, `OrderCard.Footer`) sharing context, rather than a single component with many boolean props.
+- **No boolean prop proliferation** — if a component needs `isAdmin`, `isEmployee`, `showCost`, `showProfit` all as booleans, use a `role` prop and derive the rest inside. One source of truth.
+
+### Server Actions (when added in Plan 2)
+- Every server action must authenticate the session with `getServerSession(authOptions)` before touching the DB — same pattern as API routes. Never trust client-passed user IDs.
