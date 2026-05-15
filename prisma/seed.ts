@@ -53,7 +53,7 @@ async function main() {
 
   console.log(`Seeding admin user: ${adminEmail}`)
   const hashedPassword = await hash(adminPassword, 12)
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
@@ -64,6 +64,65 @@ async function main() {
       role: "admin",
     },
   })
+
+  console.log("Seeding test order...")
+  const existing = await prisma.order.findUnique({ where: { token: "seed-test-order-1" } })
+  if (!existing) {
+    await prisma.order.create({
+      data: {
+        userId: admin.id,
+        stateId: 1, // Needs Review
+        nickname: "Test Order #1",
+        customerNotes: "Please make it blue.",
+        totalQty: 24,
+        subTotal: 240.00,
+        salesTax: 18.60,
+        totalPrice: 258.60,
+        totalAmount: 258.60,
+        cost: 120.00,
+        profit: 120.00,
+        isPaid: false,
+        token: "seed-test-order-1",
+        dueDate: new Date("2026-06-15"),
+        orderLineItems: {
+          create: [
+            {
+              description: "Custom T-Shirts",
+              qty: 12,
+              unitPrice: 10.00,
+              lineTotal: 120.00,
+              unitCost: 5.00,
+              sortOrder: 0,
+              variants: {
+                create: [
+                  { variant: "S", qty: 3, price: 10.00, cost: 5.00 },
+                  { variant: "M", qty: 5, price: 10.00, cost: 5.00 },
+                  { variant: "L", qty: 4, price: 10.00, cost: 5.00 },
+                ],
+              },
+            },
+            {
+              description: "Custom Hoodies",
+              qty: 12,
+              unitPrice: 10.00,
+              lineTotal: 120.00,
+              unitCost: 5.00,
+              sortOrder: 1,
+              variants: {
+                create: [
+                  { variant: "M", qty: 6, price: 10.00, cost: 5.00 },
+                  { variant: "L", qty: 6, price: 10.00, cost: 5.00 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    })
+    console.log("Test order created.")
+  } else {
+    console.log("Test order already exists — skipping.")
+  }
 
   console.log("Seed complete.")
 }

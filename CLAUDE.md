@@ -27,7 +27,7 @@ npx prisma db seed  # seeds admin user, 7 OrderStates, UniversalSettings
 
 **OWA reference:** `/Developer/repos/onewitharts` is the behavioral blueprint. Frontend must be fully rebuilt (NextUI → shadcn, files were 8,500 lines). Backend logic reusable at ~25% — strip screen-print-specific fields, use as reference not copy-paste.
 
-**Design docs:** Spec → `docs/superpowers/specs/2026-05-14-quoting-template-design.md` · Plan 1 (Foundation) → `docs/superpowers/plans/2026-05-14-plan1-foundation.md`
+**Design docs:** Spec → `docs/superpowers/specs/2026-05-14-quoting-template-design.md` · Plan 1 (Foundation) → `docs/superpowers/plans/2026-05-14-plan1-foundation.md` · Plan 2 (Dashboard) → `docs/superpowers/plans/2026-05-14-plan2-dashboard.md` · Plan 2.5 (UI Polish) → `docs/superpowers/plans/2026-05-15-plan2.5-dashboard-ui-polish.md`
 
 **Template rules:**
 - All code stays under `src/` — non-negotiable

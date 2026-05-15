@@ -3,7 +3,7 @@
 import { useSession, signIn, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { Eye, EyeOff, Package, Settings, LogOut } from "lucide-react"
+import { Eye, EyeOff, LayoutGrid, BarChart2, Users, Settings, UserCog, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -122,11 +122,25 @@ export default function NavbarAccountPanel({ isOpen, onClose, navigate }: Props)
           </div>
           <div className="py-2">
             {isStaff ? (
-              <PanelItem icon={<Package className="h-4 w-4" />} onClick={() => navigate("/dashboard")}>Dashboard</PanelItem>
+              <>
+                <PanelItem icon={<LayoutGrid className="h-4 w-4" />} onClick={() => navigate("/dashboard?view=orders")}>Orders</PanelItem>
+                <PanelSubItem onClick={() => navigate("/dashboard?view=calendar")}>Calendar</PanelSubItem>
+                <PanelSubItem onClick={() => navigate("/dashboard?view=complete")}>Complete</PanelSubItem>
+                <PanelSubItem onClick={() => navigate("/dashboard?view=archive")}>Archive</PanelSubItem>
+                {role === "admin" ? (
+                  <>
+                    <PanelItem icon={<BarChart2 className="h-4 w-4" />} onClick={() => navigate("/dashboard?view=insights")}>Insights</PanelItem>
+                    <PanelItem icon={<Users className="h-4 w-4" />} onClick={() => navigate("/dashboard?view=users")}>Users</PanelItem>
+                    <PanelItem icon={<Settings className="h-4 w-4" />} onClick={() => navigate("/dashboard?view=settings")}>Settings</PanelItem>
+                  </>
+                ) : null}
+              </>
             ) : (
-              <PanelItem icon={<Package className="h-4 w-4" />} onClick={() => navigate("/account")}>Orders</PanelItem>
+              <>
+                <PanelItem icon={<LayoutGrid className="h-4 w-4" />} onClick={() => navigate("/account")}>Orders</PanelItem>
+                <PanelItem icon={<UserCog className="h-4 w-4" />} onClick={() => navigate("/account/settings")}>Account Settings</PanelItem>
+              </>
             )}
-            <PanelItem icon={<Settings className="h-4 w-4" />} onClick={() => navigate("/account/settings")}>Settings</PanelItem>
             <button
               className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-(--color-danger) hover:bg-(--color-surface) transition-colors motion-reduce:transition-none w-full text-left touch-manipulation"
               onClick={() => { onClose(); signOut({ callbackUrl: "/" }) }}
@@ -252,7 +266,7 @@ function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) 
     <button
       type="button"
       onClick={onToggle}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-muted) hover:text-(--color-foreground)"
       aria-label={show ? "Hide password" : "Show password"}
     >
       {show ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -267,6 +281,17 @@ function PanelItem({ icon, onClick, children }: { icon: React.ReactNode; onClick
       onClick={onClick}
     >
       {icon}
+      {children}
+    </button>
+  )
+}
+
+function PanelSubItem({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      className="flex items-center pl-11 pr-4 py-2 text-xs text-(--color-muted) hover:text-(--color-foreground) hover:bg-(--color-surface) transition-colors motion-reduce:transition-none w-full text-left touch-manipulation"
+      onClick={onClick}
+    >
       {children}
     </button>
   )

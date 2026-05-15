@@ -58,8 +58,8 @@ export default function NavbarLinks() {
             </div>
           </button>
 
-          {/* Logo */}
-          <Link href="/" onClick={closeAll} className="font-semibold text-(--color-foreground) text-lg tracking-tight shrink-0">
+          {/* Logo — desktop: inline in left group */}
+          <Link href="/" onClick={closeAll} className="hidden md:block font-semibold text-(--color-foreground) text-lg tracking-tight shrink-0">
             QuotingApp
           </Link>
 
@@ -74,6 +74,11 @@ export default function NavbarLinks() {
             ) : null}
           </nav>
         </div>
+
+        {/* Logo — mobile: perfectly centered via absolute positioning */}
+        <Link href="/" onClick={closeAll} className="md:hidden absolute left-1/2 -translate-x-1/2 font-semibold text-(--color-foreground) text-lg tracking-tight pointer-events-auto">
+          QuotingApp
+        </Link>
 
         {/* Right group: account icon always on far right */}
         <button

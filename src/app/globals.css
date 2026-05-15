@@ -28,6 +28,10 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
+  /* Calendar */
+  --color-today: #3b82f6;
+  --color-today-bg: #eff6ff;
+
   /* Kanban state column headers — match OrderState seed colors */
   --color-state-review: #f59e0b;
   --color-state-awaiting: #3b82f6;
@@ -41,6 +45,12 @@
   --radius: 0.5rem;
 
   /* shadcn required variables (mapped to our theme) */
+  /* TODO[7]: shadcn Tailwind 4 CSS variable bridge — bg-popover/bg-muted/bg-card/text-muted-foreground
+     etc. in src/components/ui/ resolve to bg-[--color-{name}] in Tailwind 4, but only --color-background
+     and --color-foreground are in @theme inline. The others are transparent. Naming collision prevents a
+     simple @theme inline fix (--color-muted is already used as a text color here). Resolution: audit which
+     shadcn utility classes are actively used, add --color-popover/--color-card as separate @theme entries,
+     and rename --color-muted to --color-muted-text so it can't collide with shadcn's --muted bg token. */
   --background: var(--color-background);
   --foreground: var(--color-foreground);
   --card: var(--color-surface);
