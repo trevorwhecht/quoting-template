@@ -3379,7 +3379,7 @@ npm run dev
 - [ ] Icon-only buttons all have `aria-label`
 - [ ] State change in order sheet wrapped in `useTransition`
 - [ ] `{condition ? <X /> : null}` — no `{condition && <X />}`
-- [ ] CSS variable syntax throughout: `text-(--color-foreground)` not `text-[var(...)]`
+- [ ] CSS variable syntax throughout: `text-(--color-foreground)` not the legacy bracket syntax
 - [ ] All files under ~250 lines
 
 ---

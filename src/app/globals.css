@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /* Exclude non-source dirs so Tailwind doesn't parse example/plan code as real utilities */
-@source not "../../docs/**";
-@source not "../../.claude/**";
+@source not "./docs/**";
+@source not "./.claude/**";
 
 :root {
   color-scheme: light;

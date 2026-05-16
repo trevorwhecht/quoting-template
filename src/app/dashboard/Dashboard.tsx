@@ -78,8 +78,8 @@ function DashboardInner({ role, firstName, lastName }: Props) {
     if (view === "archive") return <DashboardArchiveView orders={orders} loading={ordersLoading} onOpenOrder={handleOpenOrder} />
     if (view === "insights" && role === "admin") return <DashboardInsightsView />
     if (view === "users" && role === "admin") return <DashboardUsersView />
-    if (view === "settings" && role === "admin") return <DashboardSettingsView orderStates={orderStates} onStateUpdated={updateState} onStatesRefetch={refetchStates} />
-    return <DashboardKanban orders={orders} loading={ordersLoading} orderStates={activeStates} statesLoading={statesLoading} onOpenOrder={handleOpenOrder} role={role} />
+    if (view === "settings" && role === "admin") return <DashboardSettingsView />
+    return <DashboardKanban orders={orders} loading={ordersLoading} orderStates={activeStates} statesLoading={statesLoading} onOpenOrder={handleOpenOrder} onOrderMoved={refetchOrders} role={role} />
   }
 
   return (

@@ -13,6 +13,7 @@ type Props = {
   orderStates: OrderStateModel[]
   statesLoading: boolean
   onOpenOrder: (order: OrderDetail) => void
+  onOrderMoved: () => void
   role: string
 }
 
@@ -23,7 +24,7 @@ const SUB_TABS = [
   { key: "archive", label: "Archive" },
 ]
 
-export default function DashboardOrdersView({ orders, loading, orderStates, statesLoading, onOpenOrder, role }: Props) {
+export default function DashboardOrdersView({ orders, loading, orderStates, statesLoading, onOpenOrder, onOrderMoved, role }: Props) {
   const searchParams = useSearchParams()
   const sub = searchParams.get("sub") ?? "default"
 
@@ -54,6 +55,7 @@ export default function DashboardOrdersView({ orders, loading, orderStates, stat
         orderStates={orderStates}
         statesLoading={statesLoading}
         onOpenOrder={onOpenOrder}
+        onOrderMoved={onOrderMoved}
         role={role}
       />
     </div>

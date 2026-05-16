@@ -1,6 +1,13 @@
 import type { OrderStateModel } from "./orderState"
 import type { UserSummary } from "./user"
 
+export type SetupCostItem = {
+  label: string
+  qty: number
+  rate: number
+  cost: number
+}
+
 export type OrderLineItemVariant = {
   id: number
   orderLineItemId: number
@@ -52,12 +59,13 @@ export type OrderSummary = {
   nickname: string | null
   stateId: number
   state: Pick<OrderStateModel, "id" | "name" | "color">
-  user: Pick<UserSummary, "id" | "firstName" | "lastName" | "email"> | null
+  user: Pick<UserSummary, "id" | "firstName" | "lastName" | "email" | "role"> | null
   totalQty: number
   totalPrice: number
   cost: number           // 0 for employee (stripped at API)
   profit: number         // 0 for employee (stripped at API)
   isPaid: boolean
+  paymentPlan: string | null
   dueDate: string | null
   dueDateEnd: string | null
   isHardDeadline: boolean

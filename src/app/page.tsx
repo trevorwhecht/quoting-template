@@ -11,10 +11,19 @@ export default function Home() {
         Get a quote for your project or sign in to manage your orders.
       </p>
       <div className="flex gap-4 flex-col sm:flex-row">
-        <Button size="lg" render={<Link href="/get-quote" />}>
+        <Button
+          size="lg"
+          nativeButton={false}
+          render={<Link href="/get-quote" />}
+        >
           Get a Quote
         </Button>
-        <Button variant="outline" size="lg" render={<Link href="/login" />}>
+        <Button
+          variant="outline"
+          size="lg"
+          nativeButton={false}
+          render={<Link href="/login" />}
+        >
           Sign In
         </Button>
       </div>

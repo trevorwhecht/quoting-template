@@ -24,6 +24,20 @@ const SETTINGS = [
   { setting: "currency",            value: projectConfig.currency,                   description: "Currency code" },
 ]
 
+const SETUP_FEE_PRESETS = [
+  { id: 1, name: "Artwork Fee",  description: "Per color / design",   unitLabel: "Per Design", defaultRate: 25,  defaultCost: 0,   sortOrder: 0 },
+  { id: 2, name: "Screen Setup", description: "Per screen",           unitLabel: "Per Screen", defaultRate: 15,  defaultCost: 8,   sortOrder: 1 },
+  { id: 3, name: "Rush Fee",     description: "Expedited turnaround", unitLabel: "Flat",       defaultRate: 50,  defaultCost: 0,   sortOrder: 2 },
+  { id: 4, name: "Shipping",     description: "Ground shipping",      unitLabel: "Flat",       defaultRate: 20,  defaultCost: 12,  sortOrder: 3 },
+  { id: 5, name: "Custom Item",  description: "Misc setup charge",    unitLabel: "Per Item",   defaultRate: 0,   defaultCost: 0,   sortOrder: 4 },
+]
+
+const LINE_ITEM_PRESETS = [
+  { id: 1, name: "Standard T-Shirt", description: "100% cotton, unisex", defaultPrice: new Prisma.Decimal(12.00), defaultCost: new Prisma.Decimal(5.00),  sortOrder: 0 },
+  { id: 2, name: "Premium Hoodie",   description: "Fleece pullover",      defaultPrice: new Prisma.Decimal(28.00), defaultCost: new Prisma.Decimal(14.00), sortOrder: 1 },
+  { id: 3, name: "Custom Item",      description: "Price set by admin",   defaultPrice: new Prisma.Decimal(0),     defaultCost: new Prisma.Decimal(0),     sortOrder: 2 },
+]
+
 async function main() {
   console.log("Seeding required order states...")
   for (const state of REQUIRED_STATES) {
@@ -74,6 +88,24 @@ async function main() {
       where: { setting: s.setting },
       update: { value: s.value },
       create: s,
+    })
+  }
+
+  console.log("Seeding setup fee presets...")
+  for (const p of SETUP_FEE_PRESETS) {
+    await prisma.setupFeePreset.upsert({
+      where: { id: p.id },
+      update: { name: p.name, description: p.description, unitLabel: p.unitLabel, defaultRate: p.defaultRate, defaultCost: p.defaultCost, sortOrder: p.sortOrder },
+      create: p,
+    })
+  }
+
+  console.log("Seeding line item presets...")
+  for (const p of LINE_ITEM_PRESETS) {
+    await prisma.lineItemPreset.upsert({
+      where: { id: p.id },
+      update: { name: p.name, description: p.description, defaultPrice: p.defaultPrice, defaultCost: p.defaultCost, sortOrder: p.sortOrder },
+      create: p,
     })
   }
 

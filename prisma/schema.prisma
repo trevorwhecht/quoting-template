@@ -153,7 +153,7 @@ model SetUpCost {
   id               Int      @id @default(autoincrement())
   orderId          Int
   userTotal        Decimal  @db.Decimal(10, 2)
-  adminTotal       Decimal  @default(0) @db.Decimal(10, 2)
+  adminTotal       Decimal  @default(0) @db.Decimal(10, 2) //this is the admin's cost
   customSetupItems Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -224,6 +224,37 @@ model UniversalSettings {
   updatedAt     DateTime @updatedAt
 
   @@map("universal_settings")
+}
+
+model SetupFeePreset {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  unitLabel   String   @default("Per Item")
+  defaultRate Float    @default(0)
+  defaultCost Float    @default(0)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("setup_fee_presets")
+}
+
+// STUB — replace this table with your real inventory catalog when forking.
+// See README § "Early Setup: Inventory / Catalog".
+model LineItemPreset {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  defaultPrice Decimal  @db.Decimal(10, 2)
+  defaultCost  Decimal  @db.Decimal(10, 2)
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("line_item_presets")
 }
 
 // NextAuth required tables

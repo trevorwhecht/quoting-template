@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext } from "react"
+import { useDraggable } from "@dnd-kit/core"
 import { format, isPast } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -18,15 +19,45 @@ function useCard(): Ctx {
   return ctx
 }
 
+function CardShell({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "group relative bg-(--color-background) border border-(--color-border) rounded-lg p-3 hover:shadow-sm transition-shadow motion-reduce:transition-none",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
 function Root({ order, role, onOpen, children }: Ctx & { children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: order.id,
+    data: { order },
+  })
+
   return (
     <CardCtx.Provider value={{ order, role, onOpen }}>
-      <div
-        className="group relative bg-(--color-background) border border-(--color-border) rounded-lg p-3 cursor-pointer hover:shadow-sm transition-shadow motion-reduce:transition-none"
+      <CardShell
+        ref={setNodeRef}
+        className={cn("cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}
         onClick={onOpen}
+        {...attributes}
+        {...listeners}
       >
         {children}
-      </div>
+      </CardShell>
+    </CardCtx.Provider>
+  )
+}
+
+function Overlay({ order, role, children }: Omit<Ctx, "onOpen"> & { children: React.ReactNode }) {
+  return (
+    <CardCtx.Provider value={{ order, role, onOpen: () => {} }}>
+      <CardShell className="rotate-1 shadow-lg opacity-95 cursor-grabbing">{children}</CardShell>
     </CardCtx.Provider>
   )
 }
@@ -116,4 +147,4 @@ function Footer() {
   )
 }
 
-export const OrderCard = Object.assign(Root, { Header, Badges, Footer })
+export const OrderCard = Object.assign(Root, { Header, Badges, Footer, Overlay })
