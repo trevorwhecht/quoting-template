@@ -86,7 +86,7 @@ model Order {
   rushFeePercent  Decimal?  @db.Decimal(5, 4)
   rushFeeDays     Int?
   isPaid          Boolean   @default(false)
-  paymentPlan     String?
+  paymentPlan     String?  //full up front, deposit, or atpickup
   finalPrice      Decimal?  @db.Decimal(10, 2)
   dueDate         DateTime?
   dueDateEnd      DateTime?

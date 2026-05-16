@@ -52,7 +52,21 @@ description: your-project-name — one line description of what this project doe
 
 ---
 
-### 3. Install Dependencies
+### 3. Configure Your Fork
+
+Run the setup wizard to set your business name, description, tax rate, and active order states:
+
+```bash
+npm run setup
+```
+
+The wizard prompts for each setting and shows the current value in brackets — press Enter to keep it or type a new value. Settings are written to `project.config.ts` at the project root.
+
+> Re-run `npm run setup` any time to update these settings. After changing them, re-run `npx prisma db seed` to sync the changes to your database.
+
+---
+
+### 4. Install Dependencies
 
 ```bash
 npm install
@@ -60,7 +74,7 @@ npm install
 
 ---
 
-### 4. Set Up Environment Variables
+### 5. Set Up Environment Variables
 
 Copy the env template and fill in your values:
 ```bash
@@ -81,7 +95,7 @@ For production, create `.env.prod` with your production `DATABASE_URL` and set a
 
 ---
 
-### 5. Set Up the Database
+### 6. Set Up the Database
 
 Run migrations and generate the Prisma client:
 ```bash
@@ -96,7 +110,7 @@ npx prisma db seed
 
 ---
 
-### 6. Define the UI Theme
+### 7. Define the UI Theme
 
 This step locks in the visual identity for the project. Run the skill in Claude Code:
 
@@ -115,7 +129,7 @@ The skill will recommend a complete palette, font pairing, and style direction. 
 
 ---
 
-### 7. Start the Dev Server
+### 8. Start the Dev Server
 
 ```bash
 npm run dev         # port 3000, local DB
@@ -126,7 +140,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-### 8. Set Up Vercel (when ready to deploy)
+### 9. Set Up Vercel (when ready to deploy)
 
 1. Push your repo to GitHub
 2. Import it at [vercel.com/new](https://vercel.com/new)
@@ -156,9 +170,51 @@ src/
 
 | Command | Description |
 |---|---|
+| `npm run setup` | Configure your fork (business name, tax rate, order states) |
 | `npm run dev` | Dev server on port 3000 (local DB) |
 | `npm run dev:prod` | Dev server on port 3001 (prod DB) |
 | `npm run build` | `prisma generate` + `next build` |
 | `npx prisma db seed` | Seed admin user + initial data |
 | `npx prisma migrate dev` | Run pending migrations |
 | `npx prisma studio` | Browse the database in a UI |
+
+---
+
+## Early Setup: Inventory / Catalog
+
+> **Every new project must replace `LineItemPreset` with a real catalog schema.**
+
+The template ships a stub `LineItemPreset` table (name, description, price, cost) seeded with generic test data. It is intentionally minimal — it exists so the quote builder and Get Quote form have something to pull from during development.
+
+**Before building any customer-facing quote flows on a real project, design and implement your actual inventory/catalog system.** A real implementation typically needs:
+
+- Product variants (size, color, SKU, material)
+- Product images
+- Tiered or quantity-based pricing
+- Category grouping
+- Stock tracking
+- Supplier / vendor fields
+
+Do this in the early setup phase alongside `npm run setup` and the UI theme step. The stub migrations can be deleted or replaced — do not extend the stub table for production use.
+
+---
+
+## Developer Configuration
+
+`project.config.ts` at the project root is the single file for all business-level settings. It is committed to git so your fork's config stays in version control.
+
+| Setting | Description |
+|---|---|
+| `businessName` | Displayed name for the business |
+| `businessDescription` | Short description shown in metadata and emails |
+| `taxRate` | Sales tax as a decimal (e.g. `0.0775` = 7.75%) |
+| `currency` | Currency code — edit manually if needed (not in wizard) |
+| `orderStates.awaitingPayment` | Toggle "Awaiting Payment" order state |
+| `orderStates.inProgress` | Toggle "In Progress" order state |
+| `orderStates.readyForPickup` | Toggle "Ready for Pickup" order state |
+| `orderStates.paymentNeeded` | Toggle "Payment Needed" order state |
+
+**To add a new setting in the future:**
+1. Add the field to `projectConfig` in `project.config.ts`
+2. Add a prompt for it in `scripts/setup.ts`
+3. Add the field to `SETTINGS` in `prisma/seed.ts` (if it should live in the database)

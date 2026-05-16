@@ -33,7 +33,7 @@ type Props = {
 const ADVANCE_LABELS: Record<number, string> = {
   1: "Send To Customer",
   2: "Approve For Customer",
-  3: "Mark Ready for Pickup",
+  3: "Mark Awaiting Pickup",
   4: "Request Final Payment",
   5: "Mark Complete",
 }

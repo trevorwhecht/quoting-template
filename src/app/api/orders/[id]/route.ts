@@ -120,8 +120,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const STATE_NOTIFICATIONS: Record<number, { title: string; message: string }> = {
       2: { title: "Quote Ready to Review", message: `Your quote #${orderId} has been reviewed and is ready for your approval.` },
       3: { title: "Order In Progress", message: `We've started working on your order #${orderId}. Estimated completion date will be set soon.` },
-      4: { title: "Ready for Pickup", message: `Your order #${orderId} is complete and ready for pickup!` },
-      5: { title: "Final Payment Needed", message: `Your order #${orderId} is ready. Please arrange final payment before pickup.` },
+      4: { title: "Awaiting Pickup", message: `Your order #${orderId} is complete and ready for pickup!` },
+      5: { title: "Awaiting Payment", message: `Your order #${orderId} is ready. Please arrange final payment before pickup.` },
       6: { title: "Order Complete", message: `Your order #${orderId} has been completed. Thank you for your business!` },
     }
     const notifData = STATE_NOTIFICATIONS[stateId as number]
