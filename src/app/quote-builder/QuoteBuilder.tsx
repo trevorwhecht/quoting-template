@@ -26,6 +26,7 @@ export type DraftLineItem = {
 export type DraftSetupCost = {
   localId: string
   label: string
+  description: string | null
   qty: number
   rate: number
   cost: number
@@ -49,6 +50,7 @@ function toDraftSetupCost(sc: OrderDetail["setUpCosts"][0]): DraftSetupCost {
   return {
     localId: String(sc.id),
     label: item?.label ?? "",
+    description: item?.description ?? null,
     qty: item?.qty ?? 1,
     rate: item?.rate ?? sc.userTotal,
     cost: item?.cost ?? sc.adminTotal,
@@ -141,7 +143,7 @@ export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUse
     const body: Record<string, any> = {
       nickname: draftNickname || null,
       lineItems: draftLineItems.map(({ description, qty, unitPrice, unitCost }) => ({ description, qty, unitPrice, unitCost })),
-      setUpCosts: draftSetupCosts.map(({ label, qty, rate, cost }) => ({ label, qty, rate, cost })),
+      setUpCosts: draftSetupCosts.map(({ label, description, qty, rate, cost }) => ({ label, description, qty, rate, cost })),
     }
     if (role === "admin") {
       body.discountManual = draftDiscount

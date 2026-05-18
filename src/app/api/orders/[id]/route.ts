@@ -145,14 +145,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Replace setup costs if provided
   if (setUpCosts !== undefined) {
     await prisma.setUpCost.deleteMany({ where: { orderId } })
-    const scData = setUpCosts as { label: string; qty: number; rate: number; cost: number }[]
+    const scData = setUpCosts as { label: string; description?: string | null; qty: number; rate: number; cost: number }[]
     if (scData.length > 0) {
       await prisma.setUpCost.createMany({
         data: scData.map((sc) => ({
           orderId,
           userTotal: sc.rate * sc.qty,
           adminTotal: sc.cost * sc.qty,
-          customSetupItems: [{ label: sc.label, qty: sc.qty, rate: sc.rate, cost: sc.cost }],
+          customSetupItems: [{ label: sc.label, description: sc.description ?? null, qty: sc.qty, rate: sc.rate, cost: sc.cost }],
           createdBy: session.user.email ?? null,
         })),
       })

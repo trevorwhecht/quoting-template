@@ -3,6 +3,7 @@ import type { UserSummary } from "./user"
 
 export type SetupCostItem = {
   label: string
+  description?: string | null
   qty: number
   rate: number
   cost: number

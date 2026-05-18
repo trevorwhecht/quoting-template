@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { newLocalId } from "../quoteBuilderUtils"
+import SectionShell from "@/components/shared/layout/SectionShell"
 import type { LineItemPreset } from "@/models/preset"
 import type { DraftLineItem } from "../QuoteBuilder"
 import type { QuoteBuilderPermissions } from "../quoteBuilderPermissions"
@@ -67,8 +68,30 @@ export default function QuoteBuilderOrderItems({ items, onChange, permissions }:
   const totalProfit = totalAmount - totalCost
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold text-(--color-foreground)">Order Items</h2>
+    <SectionShell
+      title="Order Items"
+      action={permissions.canAddRemoveLineItems ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm" }) + " gap-1"}>
+            Add Line Item <ChevronDown size={14} />
+          </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-(--color-background)">
+              {presets.map((p) => (
+                <DropdownMenuItem key={p.id} onClick={() => addFromPreset(p)}>
+                  <div>
+                    <p className="font-medium">{p.name}</p>
+                    {p.description ? <p className="text-xs text-(--color-muted)">{p.description}</p> : null}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowCustomDialog(true)}>
+                + Add Custom Item
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+    >
       <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
         <table className={`w-full text-sm ${isAdmin ? "min-w-180" : "min-w-120"}`}>
           <thead>
@@ -166,28 +189,6 @@ export default function QuoteBuilderOrderItems({ items, onChange, permissions }:
         </table>
       </div>
 
-      {permissions.canAddRemoveLineItems ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm" }) + " gap-1"}>
-            Add Line Item <ChevronDown size={14} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 bg-(--color-background)">
-            {presets.map((p) => (
-              <DropdownMenuItem key={p.id} onClick={() => addFromPreset(p)}>
-                <div>
-                  <p className="font-medium">{p.name}</p>
-                  {p.description ? <p className="text-xs text-(--color-muted)">{p.description}</p> : null}
-                </div>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowCustomDialog(true)}>
-              + Add Custom Item
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
-
       <Dialog open={showCustomDialog} onOpenChange={setShowCustomDialog}>
         <DialogContent className="bg-(--color-background)">
           <DialogHeader>
@@ -234,6 +235,6 @@ export default function QuoteBuilderOrderItems({ items, onChange, permissions }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </SectionShell>
   )
 }

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { computeOrderTotals } from "@/services/orderService"
+import SectionShell from "@/components/shared/layout/SectionShell"
 import GetQuoteAddItemDialog, { type AddItemResult } from "./GetQuote-AddItemDialog"
 import type { LineItemPreset, SetupFeePreset } from "@/models/preset"
 import type { UserSummary } from "@/models/user"
@@ -70,8 +71,8 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
     setLineItems((prev) => [...prev, { ...item, localId: newId() }])
   }
 
-  function updateLineQty(localId: string, qty: number) {
-    setLineItems((prev) => prev.map((li) => li.localId === localId ? { ...li, qty } : li))
+  function updateLineField(localId: string, field: keyof FormLineItem, value: number) {
+    setLineItems((prev) => prev.map((li) => li.localId === localId ? { ...li, [field]: value } : li))
   }
 
   function handleAddSetupCost() {
@@ -131,87 +132,169 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
     })
   }
 
+  // colspan for setup costs empty-state row
+  const setupColSpan = isAdmin ? 6 : 5
+
+  const orderTotalsContent = (
+    <SectionShell title="Order Totals">
+      <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
+        <table className="w-full text-sm min-w-60">
+          <thead>
+            <tr className="border-b border-(--color-border) bg-(--color-surface)">
+              <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Description</th>
+              <th className="text-right px-3 py-2.5 font-medium text-(--color-muted)">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.length === 0 ? (
+              <tr>
+                <td colSpan={2} className="px-3 py-6 text-center text-sm text-(--color-muted)">
+                  No items added yet.
+                </td>
+              </tr>
+            ) : (
+              <>
+                <tr className="border-b border-(--color-border)">
+                  <td className="px-3 py-2.5 text-(--color-foreground)">Sub Total</td>
+                  <td className="px-3 py-2.5 text-right font-medium">
+                    {hasCustomTbd ? <span className="text-(--color-muted)">${totals.subTotal.toFixed(2)} + TBD</span> : `$${totals.subTotal.toFixed(2)}`}
+                  </td>
+                </tr>
+                {taxRate > 0 ? (
+                  <tr className="border-b border-(--color-border)">
+                    <td className="px-3 py-2.5 text-(--color-foreground)">
+                      Sales Tax <span className="text-xs text-(--color-muted) ml-1">({(taxRate * 100).toFixed(2)}%)</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-medium">
+                      {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.salesTax.toFixed(2)}`}
+                    </td>
+                  </tr>
+                ) : null}
+                <tr className={isAdmin ? "border-b border-(--color-border)" : ""}>
+                  <td className="px-3 py-2.5 font-semibold text-(--color-foreground)">
+                    {hasCustomTbd ? "Est. Total" : "Total"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-bold text-base">
+                    {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.totalPrice.toFixed(2)}`}
+                  </td>
+                </tr>
+                {isAdmin ? (
+                  <tr>
+                    <td className="px-3 py-2.5 text-(--color-success)">Profit</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-(--color-success)">${totals.profit.toFixed(2)}</td>
+                  </tr>
+                ) : null}
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {hasCustomTbd && !isAdmin && lineItems.length > 0 ? (
+        <p className="text-xs text-(--color-muted)">* Custom items are priced by our team after review.</p>
+      ) : null}
+    </SectionShell>
+  )
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="px-4 md:px-6 py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-(--color-foreground)">Request a Quote</h1>
         <p className="text-sm text-(--color-muted) mt-1">Tell us what you need. We&apos;ll review and send you a detailed quote shortly.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+
         {/* Order Items */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-(--color-foreground)">Order Items</h2>
+        <SectionShell
+          title="Order Items"
+          action={
             <Button type="button" variant="outline" size="sm" onClick={() => setShowAddItem(true)} className="gap-1">
               <Plus size={14} /> Add Item
             </Button>
-          </div>
-          {lineItems.length > 0 ? (
-            <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
-              <table className={`w-full text-sm ${isAdmin ? "min-w-160" : "min-w-100"}`}>
-                <thead>
-                  <tr className="border-b border-(--color-border) bg-(--color-surface)">
-                    <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Item</th>
-                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-16">Qty</th>
-                    {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Cost</th> : null}
-                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Rate</th>
-                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Amount</th>
-                    {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-success) w-24">Profit</th> : null}
-                    <th className="w-8" />
+          }
+        >
+          <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
+            <table className={`w-full text-sm ${isAdmin ? "min-w-180" : "min-w-100"}`}>
+              <thead>
+                <tr className="border-b border-(--color-border) bg-(--color-surface)">
+                  <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Item</th>
+                  <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-16 whitespace-nowrap">Qty</th>
+                  {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Cost</th> : null}
+                  <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Rate</th>
+                  <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Amount</th>
+                  {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-success) w-24 whitespace-nowrap">Profit</th> : null}
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdmin ? 7 : 5} className="px-3 py-6 text-center text-sm text-(--color-muted)">
+                      No items added — click &ldquo;Add Item&rdquo; to get started.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((item) => (
-                    <tr key={item.localId} className="border-b border-(--color-border) last:border-0">
-                      <td className="px-3 py-2.5 text-(--color-foreground) font-medium">{item.description}</td>
-                      <td className="px-3 py-2 text-right">
-                        <Input type="number" inputMode="numeric" min={1} autoComplete="off"
-                          value={item.qty} onChange={(e) => updateLineQty(item.localId, Math.max(1, Number(e.target.value)))}
-                          className="text-base h-8 w-16 text-right" />
+                ) : null}
+                {lineItems.map((item) => (
+                  <tr key={item.localId} className="border-b border-(--color-border) last:border-0">
+                    <td className="px-3 py-2.5 text-(--color-foreground) font-medium">{item.description}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <Input type="number" inputMode="numeric" min={1} autoComplete="off"
+                        value={item.qty} onChange={(e) => updateLineField(item.localId, "qty", Math.max(1, Number(e.target.value)))}
+                        className="text-base h-8 w-16 text-right" />
+                    </td>
+                    {isAdmin ? (
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <Input type="number" inputMode="decimal" step="0.01" min={0} autoComplete="off"
+                          value={item.unitCost}
+                          onChange={(e) => updateLineField(item.localId, "unitCost", Number(e.target.value))}
+                          className="text-base h-8 w-24 text-right" />
                       </td>
+                    ) : null}
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {isAdmin ? (
-                        <td className="px-3 py-2.5 text-right text-(--color-muted)">${item.unitCost.toFixed(2)}</td>
-                      ) : null}
-                      <td className="px-3 py-2.5 text-right text-(--color-muted)">
-                        {item.isCustom && item.unitPrice === 0 ? "TBD" : `$${item.unitPrice.toFixed(2)}`}
+                        <Input type="number" inputMode="decimal" step="0.01" min={0} autoComplete="off"
+                          value={item.unitPrice}
+                          onChange={(e) => updateLineField(item.localId, "unitPrice", Number(e.target.value))}
+                          className="text-base h-8 w-24 text-right" />
+                      ) : (
+                        <span className="text-(--color-muted) block text-right">
+                          {item.isCustom && item.unitPrice === 0 ? "TBD" : `$${item.unitPrice.toFixed(2)}`}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-medium text-(--color-foreground) whitespace-nowrap">
+                      {item.isCustom && item.unitPrice === 0 ? "TBD" : `$${(item.qty * item.unitPrice).toFixed(2)}`}
+                    </td>
+                    {isAdmin ? (
+                      <td className="px-3 py-2.5 text-right text-(--color-success) whitespace-nowrap">
+                        ${((item.qty * item.unitPrice) - (item.qty * item.unitCost)).toFixed(2)}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-medium text-(--color-foreground)">
-                        {item.isCustom && item.unitPrice === 0 ? "TBD" : `$${(item.qty * item.unitPrice).toFixed(2)}`}
-                      </td>
-                      {isAdmin ? (
-                        <td className="px-3 py-2.5 text-right text-(--color-success)">
-                          ${((item.qty * item.unitPrice) - (item.qty * item.unitCost)).toFixed(2)}
-                        </td>
-                      ) : null}
-                      <td className="px-3 py-2">
-                        <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-(--color-danger)"
-                          onClick={() => setLineItems((prev) => prev.filter((li) => li.localId !== item.localId))}>
-                          <Trash2 size={14} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="border border-dashed border-(--color-border) rounded-lg py-8 text-center text-sm text-(--color-muted)">
-              No items added yet — click &ldquo;Add Item&rdquo; to get started.
-            </div>
-          )}
-        </div>
+                    ) : null}
+                    <td className="px-3 py-2">
+                      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-(--color-danger)"
+                        onClick={() => setLineItems((prev) => prev.filter((li) => li.localId !== item.localId))}
+                        aria-label="Remove item">
+                        <Trash2 size={14} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionShell>
 
-        {/* Setup Costs (admin/employee only) */}
+        {/* Setup Costs + Order Totals — side by side for staff */}
         {isStaff ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-(--color-foreground)">Setup Costs</h2>
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowAddSetup(true)} className="gap-1">
-                <Plus size={14} /> Add Setup Cost
-              </Button>
-            </div>
-            {setupCosts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_320px] gap-6 items-start">
+            <SectionShell
+              title="Setup Costs"
+              action={
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowAddSetup(true)} className="gap-1">
+                  <Plus size={14} /> Add Setup Cost
+                </Button>
+              }
+            >
               <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
                 <table className={`w-full text-sm ${isAdmin ? "min-w-120" : "min-w-100"}`}>
                   <thead>
@@ -225,6 +308,13 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
                     </tr>
                   </thead>
                   <tbody>
+                    {setupCosts.length === 0 ? (
+                      <tr>
+                        <td colSpan={setupColSpan} className="px-3 py-6 text-center text-sm text-(--color-muted)">
+                          No setup costs added.
+                        </td>
+                      </tr>
+                    ) : null}
                     {setupCosts.map((sc) => (
                       <tr key={sc.localId} className="border-b border-(--color-border) last:border-0">
                         <td className="px-3 py-2.5 text-(--color-foreground)">{sc.label}</td>
@@ -234,7 +324,8 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
                         <td className="px-3 py-2.5 text-right font-medium">${(sc.rate * sc.qty).toFixed(2)}</td>
                         <td className="px-3 py-2">
                           <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-(--color-danger)"
-                            onClick={() => setSetupCosts((prev) => prev.filter((c) => c.localId !== sc.localId))}>
+                            onClick={() => setSetupCosts((prev) => prev.filter((c) => c.localId !== sc.localId))}
+                            aria-label="Remove setup cost">
                             <Trash2 size={14} />
                           </Button>
                         </td>
@@ -243,129 +334,66 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="text-sm text-(--color-muted)">No setup costs added.</p>
-            )}
+            </SectionShell>
+            {orderTotalsContent}
           </div>
-        ) : null}
+        ) : (
+          orderTotalsContent
+        )}
 
-        {/* Order Totals */}
-        {lineItems.length > 0 ? (
-          <div className="space-y-3">
-            <h2 className="text-base font-semibold text-(--color-foreground)">Order Totals</h2>
-            <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg sm:max-w-xs">
-              <table className="w-full text-sm min-w-70">
-                <thead>
-                  <tr className="border-b border-(--color-border) bg-(--color-surface)">
-                    <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Description</th>
-                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted)">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-(--color-border)">
-                    <td className="px-3 py-2.5 text-(--color-foreground)">Sub Total</td>
-                    <td className="px-3 py-2.5 text-right font-medium">
-                      {hasCustomTbd ? <span className="text-(--color-muted)">${totals.subTotal.toFixed(2)} + TBD</span> : `$${totals.subTotal.toFixed(2)}`}
-                    </td>
-                  </tr>
-                  {taxRate > 0 ? (
-                    <tr className="border-b border-(--color-border)">
-                      <td className="px-3 py-2.5 text-(--color-foreground)">
-                        Sales Tax <span className="text-xs text-(--color-muted) ml-1">({(taxRate * 100).toFixed(2)}%)</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-medium">
-                        {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.salesTax.toFixed(2)}`}
-                      </td>
-                    </tr>
-                  ) : null}
-                  <tr className={isAdmin ? "border-b border-(--color-border)" : ""}>
-                    <td className="px-3 py-2.5 font-semibold text-(--color-foreground)">
-                      {hasCustomTbd ? "Est. Total" : "Total"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-bold text-base">
-                      {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.totalPrice.toFixed(2)}`}
-                    </td>
-                  </tr>
-                  {isAdmin ? (
-                    <tr>
-                      <td className="px-3 py-2.5 text-(--color-success)">Profit</td>
-                      <td className="px-3 py-2.5 text-right font-semibold text-(--color-success)">${totals.profit.toFixed(2)}</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-            {hasCustomTbd && !isAdmin ? (
-              <p className="text-xs text-(--color-muted)">* Custom items are priced by our team after review.</p>
-            ) : null}
+        {/* Compact metadata bar — no titles */}
+        <div className="flex flex-wrap gap-3 items-end border border-(--color-border) rounded-lg p-3 bg-(--color-background)">
+          <div className="flex-1 min-w-52 space-y-1">
+            <Label htmlFor="customerNotes" className="text-xs font-medium text-(--color-muted)">Notes *</Label>
+            <Textarea id="customerNotes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)}
+              rows={2} placeholder="Describe your project — quantities, colors, style, any special requirements…" className="resize-none" />
           </div>
-        ) : null}
-
-        {/* Job Details — small, at the bottom */}
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold text-(--color-foreground)">Job Details</h2>
-          <div className="border border-(--color-border) rounded-lg p-4 space-y-4 bg-(--color-background)">
-            <div className="space-y-1.5">
-              <Label htmlFor="customerNotes">What do you need? *</Label>
-              <Textarea id="customerNotes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)}
-                rows={3} placeholder="Describe your project — quantities, colors, style, any special requirements…" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="dueDate">Due Date (optional)</Label>
-                <Input id="dueDate" type="date" autoComplete="off" value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)} className="text-base" />
-              </div>
-              <div className="flex items-end pb-1 gap-2">
-                <input type="checkbox" id="isHardDeadline" checked={isHardDeadline}
-                  onChange={(e) => setIsHardDeadline(e.target.checked)} className="h-4 w-4 mt-0.5" />
-                <Label htmlFor="isHardDeadline" className="cursor-pointer">Hard deadline</Label>
-              </div>
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="dueDate" className="text-xs font-medium text-(--color-muted)">Due Date</Label>
+            <Input id="dueDate" type="date" autoComplete="off" value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)} className="text-base w-38" />
           </div>
-        </div>
-
-        {/* Admin Settings */}
-        {isAdmin ? (
-          <div className="space-y-3">
-            <h2 className="text-base font-semibold text-(--color-foreground)">Admin Settings</h2>
-            <div className="border border-(--color-border) rounded-lg p-4 space-y-4 bg-(--color-background)">
-              <div className="space-y-1.5">
-                <Label>Assign to User</Label>
-                <div className="relative">
-                  <Input
-                    value={userSearchOpen ? userQuery : (selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName} (${selectedUser.email})` : "No Account Yet")}
-                    onChange={(e) => { setUserQuery(e.target.value); setUserSearchOpen(true) }}
-                    onFocus={() => setUserSearchOpen(true)}
-                    onBlur={() => setTimeout(() => setUserSearchOpen(false), 150)}
-                    className="text-base"
-                    placeholder="Search by name or email…"
-                  />
-                  {userSearchOpen ? (
-                    <div className="absolute z-20 top-full left-0 right-0 mt-1 border border-(--color-border) rounded-md bg-(--color-background) shadow-md max-h-52 overflow-y-auto">
-                      <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-(--color-surface) text-(--color-muted)"
-                        onMouseDown={() => { setAssignedUserId(null); setUserQuery(""); setUserSearchOpen(false) }}>
-                        No Account Yet
+          <div className="flex items-center gap-2 h-10">
+            <input type="checkbox" id="isHardDeadline" checked={isHardDeadline}
+              onChange={(e) => setIsHardDeadline(e.target.checked)} className="h-4 w-4" />
+            <Label htmlFor="isHardDeadline" className="cursor-pointer text-sm">Hard deadline</Label>
+          </div>
+          {isAdmin ? (
+            <>
+              <div className="space-y-1 min-w-52 relative">
+                <Label className="text-xs font-medium text-(--color-muted)">Assign to</Label>
+                <Input
+                  value={userSearchOpen ? userQuery : (selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName} (${selectedUser.email})` : "No Account Yet")}
+                  onChange={(e) => { setUserQuery(e.target.value); setUserSearchOpen(true) }}
+                  onFocus={() => setUserSearchOpen(true)}
+                  onBlur={() => setTimeout(() => setUserSearchOpen(false), 150)}
+                  className="text-base"
+                  placeholder="Search by name or email…"
+                />
+                {userSearchOpen ? (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 border border-(--color-border) rounded-md bg-(--color-background) shadow-md max-h-52 overflow-y-auto">
+                    <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-(--color-surface) text-(--color-muted)"
+                      onMouseDown={() => { setAssignedUserId(null); setUserQuery(""); setUserSearchOpen(false) }}>
+                      No Account Yet
+                    </button>
+                    {filteredUsers.map((u) => (
+                      <button key={u.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-(--color-surface)"
+                        onMouseDown={() => { setAssignedUserId(u.id); setUserQuery(""); setUserSearchOpen(false) }}>
+                        <span className="font-medium">{u.firstName} {u.lastName}</span>
+                        <span className="text-(--color-muted) ml-2 text-xs">{u.email}</span>
                       </button>
-                      {filteredUsers.map((u) => (
-                        <button key={u.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-(--color-surface)"
-                          onMouseDown={() => { setAssignedUserId(u.id); setUserQuery(""); setUserSearchOpen(false) }}>
-                          <span className="font-medium">{u.firstName} {u.lastName}</span>
-                          <span className="text-(--color-muted) ml-2 text-xs">{u.email}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              <div className="space-y-1.5">
-                <Label>Order Name / Nickname</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-(--color-muted)">Nickname</Label>
                 <Input value={orderNickname} onChange={(e) => setOrderNickname(e.target.value)}
-                  className="text-base" placeholder="e.g. Spring Merch Drop" />
+                  className="text-base w-44" placeholder="e.g. Spring Merch Drop" />
               </div>
-            </div>
-          </div>
-        ) : null}
+            </>
+          ) : null}
+        </div>
 
         <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <Button type="submit" disabled={isPending} className="w-full gap-2">
@@ -412,27 +440,25 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
               </div>
             ) : null}
             {setupSelection ? (
-              <>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Qty</Label>
-                    <Input type="number" inputMode="numeric" min={1} value={setupQty}
-                      onChange={(e) => setSetupQty(Math.max(1, Number(e.target.value)))} className="text-base" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Rate</Label>
-                    <Input type="number" inputMode="decimal" step="0.01" value={setupRate}
-                      onChange={(e) => setSetupRate(Number(e.target.value))} className="text-base" />
-                  </div>
-                  {isAdmin ? (
-                    <div className="space-y-1.5">
-                      <Label>Cost</Label>
-                      <Input type="number" inputMode="decimal" step="0.01" value={setupCost}
-                        onChange={(e) => setSetupCostVal(Number(e.target.value))} className="text-base" />
-                    </div>
-                  ) : null}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Qty</Label>
+                  <Input type="number" inputMode="numeric" min={1} value={setupQty}
+                    onChange={(e) => setSetupQty(Math.max(1, Number(e.target.value)))} className="text-base" />
                 </div>
-              </>
+                <div className="space-y-1.5">
+                  <Label>Rate</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={setupRate}
+                    onChange={(e) => setSetupRate(Number(e.target.value))} className="text-base" />
+                </div>
+                {isAdmin ? (
+                  <div className="space-y-1.5">
+                    <Label>Cost</Label>
+                    <Input type="number" inputMode="decimal" step="0.01" value={setupCost}
+                      onChange={(e) => setSetupCostVal(Number(e.target.value))} className="text-base" />
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <DialogFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
