@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { serializeOrder, stripAdminFields, computeOrderTotals } from "@/services/orderService"
+import { serializeOrder, stripAdminFields, computeOrderTotals, getEmployeeFieldPermissions } from "@/services/orderService"
 
 const ORDER_DETAIL_INCLUDE = {
   state: true,
@@ -26,7 +26,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!order) return NextResponse.json({ data: null, error: "Not found" }, { status: 404 })
 
   const serialized = serializeOrder(order)
-  return NextResponse.json({ data: role === "employee" ? stripAdminFields(serialized) : serialized, error: null })
+  const perms = role === "employee" ? await getEmployeeFieldPermissions() : undefined
+  return NextResponse.json({ data: role === "employee" ? stripAdminFields(serialized, perms) : serialized, error: null })
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -182,7 +183,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const serialized = serializeOrder(updated)
-  return NextResponse.json({ data: role === "employee" ? stripAdminFields(serialized) : serialized, error: null })
+  const perms2 = role === "employee" ? await getEmployeeFieldPermissions() : undefined
+  return NextResponse.json({ data: role === "employee" ? stripAdminFields(serialized, perms2) : serialized, error: null })
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {

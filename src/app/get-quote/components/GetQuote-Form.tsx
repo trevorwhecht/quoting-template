@@ -2,6 +2,9 @@
 
 import { useState, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
+import { useSession } from "next-auth/react"
+const ClaimModal = dynamic(() => import("@/components/shared/modals/ClaimModal"))
 import { Loader2, Trash2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { computeOrderTotals } from "@/services/orderService"
+import { Switch } from "@/components/ui/switch"
 import SectionShell from "@/components/shared/layout/SectionShell"
 import GetQuoteAddItemDialog, { type AddItemResult } from "./GetQuote-AddItemDialog"
 import type { LineItemPreset, SetupFeePreset } from "@/models/preset"
@@ -33,6 +37,8 @@ function newId() { return `${Date.now()}-${Math.random()}` }
 export default function GetQuoteForm({ role, taxRate }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const { data: session } = useSession()
+  const [showClaimModal, setShowClaimModal] = useState(false)
   const isAdmin = role === "admin"
   const isStaff = role === "admin" || role === "employee"
 
@@ -45,6 +51,10 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
   const [customerNotes, setCustomerNotes] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [isHardDeadline, setIsHardDeadline] = useState(false)
+
+  const [needsShipping, setNeedsShipping] = useState(false)
+  const [taxDeferralRequested, setTaxDeferralRequested] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
 
   const [showAddItem, setShowAddItem] = useState(false)
   const [showAddSetup, setShowAddSetup] = useState(false)
@@ -101,106 +111,48 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
   const totals = computeOrderTotals({ lineItems: liveLineItems, setUpCosts: liveSetupCosts, taxRate })
   const hasCustomTbd = lineItems.some((li) => li.isCustom && li.unitPrice === 0)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function doSubmit() {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerNotes: customerNotes || null,
+        dueDate: dueDate || null,
+        isHardDeadline,
+        needsShipping,
+        taxDeferralRequested,
+        nickname: orderNickname || null,
+        userId: isAdmin ? assignedUserId : undefined,
+        lineItems: lineItems.map(({ description, qty, unitPrice, unitCost }) => ({ description, qty, unitPrice, unitCost })),
+        setUpCosts: isStaff ? setupCosts.map(({ label, qty, rate, cost }) => ({ label, qty, rate, cost })) : undefined,
+      }),
+    })
+    const json = await res.json()
+    if (json.error) { toast.error(json.error); return }
+    const order = json.data
+    const label = order.nickname ?? `Order #${order.id}`
+    router.push(`/orders/${order.token}?name=${encodeURIComponent(label)}`)
+  }
+
+  function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!customerNotes.trim()) { toast.error("Please describe what you need."); return }
     if (lineItems.length === 0) { toast.error("Please add at least one item."); return }
     if (isAdmin && lineItems.some((li) => li.isCustom && li.unitPrice <= 0)) {
       toast.error("Please enter a price for all custom items before saving.")
       return
     }
 
-    startTransition(async () => {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerNotes,
-          dueDate: dueDate || null,
-          isHardDeadline,
-          nickname: orderNickname || null,
-          userId: isAdmin ? assignedUserId : undefined,
-          lineItems: lineItems.map(({ description, qty, unitPrice, unitCost }) => ({ description, qty, unitPrice, unitCost })),
-          setUpCosts: isStaff ? setupCosts.map(({ label, qty, rate, cost }) => ({ label, qty, rate, cost })) : undefined,
-        }),
-      })
-      const json = await res.json()
-      if (json.error) { toast.error(json.error); return }
-      const order = json.data
-      const label = order.nickname ?? `Order #${order.id}`
-      router.push(`/orders/${order.token}?name=${encodeURIComponent(label)}`)
-    })
+    if (!session) {
+      setShowClaimModal(true)
+      return
+    }
+
+    startTransition(doSubmit)
   }
-
-  // colspan for setup costs empty-state row
-  const setupColSpan = isAdmin ? 6 : 5
-
-  const orderTotalsContent = (
-    <SectionShell title="Order Totals">
-      <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
-        <table className="w-full text-sm min-w-60">
-          <thead>
-            <tr className="border-b border-(--color-border) bg-(--color-surface)">
-              <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Description</th>
-              <th className="text-right px-3 py-2.5 font-medium text-(--color-muted)">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lineItems.length === 0 ? (
-              <tr>
-                <td colSpan={2} className="px-3 py-6 text-center text-sm text-(--color-muted)">
-                  No items added yet.
-                </td>
-              </tr>
-            ) : (
-              <>
-                <tr className="border-b border-(--color-border)">
-                  <td className="px-3 py-2.5 text-(--color-foreground)">Sub Total</td>
-                  <td className="px-3 py-2.5 text-right font-medium">
-                    {hasCustomTbd ? <span className="text-(--color-muted)">${totals.subTotal.toFixed(2)} + TBD</span> : `$${totals.subTotal.toFixed(2)}`}
-                  </td>
-                </tr>
-                {taxRate > 0 ? (
-                  <tr className="border-b border-(--color-border)">
-                    <td className="px-3 py-2.5 text-(--color-foreground)">
-                      Sales Tax <span className="text-xs text-(--color-muted) ml-1">({(taxRate * 100).toFixed(2)}%)</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium">
-                      {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.salesTax.toFixed(2)}`}
-                    </td>
-                  </tr>
-                ) : null}
-                <tr className={isAdmin ? "border-b border-(--color-border)" : ""}>
-                  <td className="px-3 py-2.5 font-semibold text-(--color-foreground)">
-                    {hasCustomTbd ? "Est. Total" : "Total"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-bold text-base">
-                    {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.totalPrice.toFixed(2)}`}
-                  </td>
-                </tr>
-                {isAdmin ? (
-                  <tr>
-                    <td className="px-3 py-2.5 text-(--color-success)">Profit</td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-(--color-success)">${totals.profit.toFixed(2)}</td>
-                  </tr>
-                ) : null}
-              </>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {hasCustomTbd && !isAdmin && lineItems.length > 0 ? (
-        <p className="text-xs text-(--color-muted)">* Custom items are priced by our team after review.</p>
-      ) : null}
-    </SectionShell>
-  )
 
   return (
     <div className="px-4 md:px-6 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-(--color-foreground)">Request a Quote</h1>
-        <p className="text-sm text-(--color-muted) mt-1">Tell us what you need. We&apos;ll review and send you a detailed quote shortly.</p>
-      </div>
+      <h1 className="text-2xl font-bold text-(--color-foreground)">Build Your Quote</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -284,44 +236,46 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
           </div>
         </SectionShell>
 
-        {/* Setup Costs + Order Totals — side by side for staff */}
-        {isStaff ? (
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_320px] gap-6 items-start">
-            <SectionShell
-              title="Setup Costs"
-              action={
+        {/* Setup Costs + Order Totals — 50/50, all roles, equal height */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Setup Costs */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-(--color-foreground)">Setup Costs</h2>
+              {isStaff ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowAddSetup(true)} className="gap-1">
                   <Plus size={14} /> Add Setup Cost
                 </Button>
-              }
-            >
-              <div className="w-full overflow-x-auto border border-(--color-border) rounded-lg">
-                <table className={`w-full text-sm ${isAdmin ? "min-w-120" : "min-w-100"}`}>
-                  <thead>
-                    <tr className="border-b border-(--color-border) bg-(--color-surface)">
-                      <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Name</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-16">Qty</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Rate</th>
-                      {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Cost</th> : null}
-                      <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24">Subtotal</th>
-                      <th className="w-8" />
+              ) : null}
+            </div>
+            <div className="flex-1 w-full overflow-x-auto border border-(--color-border) rounded-lg">
+              <table className={`w-full text-sm ${isAdmin ? "min-w-120" : "min-w-80"}`}>
+                <thead>
+                  <tr className="border-b border-(--color-border) bg-(--color-surface)">
+                    <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Name</th>
+                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-16 whitespace-nowrap">Qty</th>
+                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Rate</th>
+                    {isAdmin ? <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Cost</th> : null}
+                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted) w-24 whitespace-nowrap">Subtotal</th>
+                    {isStaff ? <th className="w-8" /> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {setupCosts.length === 0 ? (
+                    <tr>
+                      <td colSpan={isAdmin ? 6 : isStaff ? 5 : 4} className="px-3 py-6 text-center text-sm text-(--color-muted)">
+                        No setup costs added.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {setupCosts.length === 0 ? (
-                      <tr>
-                        <td colSpan={setupColSpan} className="px-3 py-6 text-center text-sm text-(--color-muted)">
-                          No setup costs added.
-                        </td>
-                      </tr>
-                    ) : null}
-                    {setupCosts.map((sc) => (
-                      <tr key={sc.localId} className="border-b border-(--color-border) last:border-0">
-                        <td className="px-3 py-2.5 text-(--color-foreground)">{sc.label}</td>
-                        <td className="px-3 py-2.5 text-right">{sc.qty}</td>
-                        <td className="px-3 py-2.5 text-right">${sc.rate.toFixed(2)}</td>
-                        {isAdmin ? <td className="px-3 py-2.5 text-right text-(--color-muted)">${sc.cost.toFixed(2)}</td> : null}
-                        <td className="px-3 py-2.5 text-right font-medium">${(sc.rate * sc.qty).toFixed(2)}</td>
+                  ) : null}
+                  {setupCosts.map((sc) => (
+                    <tr key={sc.localId} className="border-b border-(--color-border) last:border-0">
+                      <td className="px-3 py-2.5 text-(--color-foreground)">{sc.label}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">{sc.qty}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">${sc.rate.toFixed(2)}</td>
+                      {isAdmin ? <td className="px-3 py-2.5 text-right whitespace-nowrap text-(--color-muted)">${sc.cost.toFixed(2)}</td> : null}
+                      <td className="px-3 py-2.5 text-right font-medium whitespace-nowrap">${(sc.rate * sc.qty).toFixed(2)}</td>
+                      {isStaff ? (
                         <td className="px-3 py-2">
                           <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-(--color-danger)"
                             onClick={() => setSetupCosts((prev) => prev.filter((c) => c.localId !== sc.localId))}
@@ -329,38 +283,118 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
                             <Trash2 size={14} />
                           </Button>
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </SectionShell>
-            {orderTotalsContent}
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        ) : (
-          orderTotalsContent
-        )}
 
-        {/* Compact metadata bar — no titles */}
-        <div className="flex flex-wrap gap-3 items-end border border-(--color-border) rounded-lg p-3 bg-(--color-background)">
-          <div className="flex-1 min-w-52 space-y-1">
-            <Label htmlFor="customerNotes" className="text-xs font-medium text-(--color-muted)">Notes *</Label>
-            <Textarea id="customerNotes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)}
-              rows={2} placeholder="Describe your project — quantities, colors, style, any special requirements…" className="resize-none" />
+          {/* Order Totals */}
+          <div className="flex flex-col gap-3">
+            <h2 className="text-base font-semibold text-(--color-foreground)">Order Totals</h2>
+            <div className="flex-1 w-full overflow-x-auto border border-(--color-border) rounded-lg">
+              <table className="w-full text-sm min-w-60">
+                <thead>
+                  <tr className="border-b border-(--color-border) bg-(--color-surface)">
+                    <th className="text-left px-3 py-2.5 font-medium text-(--color-muted)">Description</th>
+                    <th className="text-right px-3 py-2.5 font-medium text-(--color-muted)">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="px-3 py-6 text-center text-sm text-(--color-muted)">
+                        No items added yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    <>
+                      <tr className="border-b border-(--color-border)">
+                        <td className="px-3 py-2.5 text-(--color-foreground)">Sub Total</td>
+                        <td className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                          {hasCustomTbd ? <span className="text-(--color-muted)">${totals.subTotal.toFixed(2)} + TBD</span> : `$${totals.subTotal.toFixed(2)}`}
+                        </td>
+                      </tr>
+                      {taxRate > 0 ? (
+                        <tr className="border-b border-(--color-border)">
+                          <td className="px-3 py-2.5 text-(--color-foreground)">
+                            Sales Tax <span className="text-xs text-(--color-muted) ml-1">({(taxRate * 100).toFixed(2)}%)</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                            {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.salesTax.toFixed(2)}`}
+                          </td>
+                        </tr>
+                      ) : null}
+                      <tr className={isAdmin ? "border-b border-(--color-border)" : ""}>
+                        <td className="px-3 py-2.5 font-semibold text-(--color-foreground)">
+                          {hasCustomTbd ? "Est. Total" : "Total"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold text-base whitespace-nowrap">
+                          {hasCustomTbd ? <span className="text-(--color-muted)">TBD</span> : `$${totals.totalPrice.toFixed(2)}`}
+                        </td>
+                      </tr>
+                      {isAdmin ? (
+                        <tr>
+                          <td className="px-3 py-2.5 text-(--color-success)">Profit</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-(--color-success) whitespace-nowrap">${totals.profit.toFixed(2)}</td>
+                        </tr>
+                      ) : null}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {hasCustomTbd && !isAdmin && lineItems.length > 0 ? (
+              <p className="text-xs text-(--color-muted)">* Custom items are priced by our team after review.</p>
+            ) : null}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="dueDate" className="text-xs font-medium text-(--color-muted)">Due Date</Label>
-            <Input id="dueDate" type="date" autoComplete="off" value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)} className="text-base w-38" />
+        </div>
+
+        {/* Bottom: card + submit stacked, button matches card width */}
+        <div className="flex flex-col gap-3 w-fit max-w-full pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="w-full flex gap-8 flex-wrap items-start border border-(--color-border) rounded-lg p-4 bg-(--color-background)">
+
+          {/* Left: toggles with conditional reveals */}
+          <div className="flex flex-col gap-3 shrink-0">
+            {/* Hard Deadline → Due Date reveals below */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch checked={isHardDeadline} onCheckedChange={(c) => { setIsHardDeadline(c); if (!c) setDueDate("") }} id="isHardDeadline" />
+                <Label htmlFor="isHardDeadline" className="cursor-pointer text-sm">Hard Deadline</Label>
+              </div>
+              {isHardDeadline ? (
+                <div className="pl-10">
+                  <Input id="dueDate" type="date" autoComplete="off" value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)} className="text-base w-38" />
+                </div>
+              ) : null}
+            </div>
+
+            {/* Needs Shipping → reveal removed until multi-address spec */}
+            <div className="flex items-center gap-2">
+              <Switch checked={needsShipping} onCheckedChange={(c) => setNeedsShipping(c)} id="needsShipping" />
+              <Label htmlFor="needsShipping" className="cursor-pointer text-sm">Needs Shipping</Label>
+            </div>
+
+            {/* Tax Deferral */}
+            <div className="flex items-center gap-2">
+              <Switch checked={taxDeferralRequested} onCheckedChange={(c) => setTaxDeferralRequested(c)} id="taxDeferralRequested" />
+              <Label htmlFor="taxDeferralRequested" className="cursor-pointer text-sm">Tax Deferral Requested</Label>
+            </div>
           </div>
-          <div className="flex items-center gap-2 h-10">
-            <input type="checkbox" id="isHardDeadline" checked={isHardDeadline}
-              onChange={(e) => setIsHardDeadline(e.target.checked)} className="h-4 w-4" />
-            <Label htmlFor="isHardDeadline" className="cursor-pointer text-sm">Hard deadline</Label>
-          </div>
-          {isAdmin ? (
-            <>
-              <div className="space-y-1 min-w-52 relative">
+
+          {/* Right: Nickname, [Assign to admin], Notes */}
+          <div className="flex flex-col gap-3 flex-1 sm:min-w-44 sm:flex-none">
+            <div className="space-y-1">
+              <Label htmlFor="orderNickname" className="text-xs font-medium text-(--color-muted)">Nickname</Label>
+              <Input id="orderNickname" value={orderNickname} onChange={(e) => setOrderNickname(e.target.value)}
+                className="text-base" placeholder="Reference Name" />
+            </div>
+
+            {isAdmin ? (
+              <div className="space-y-1 relative">
                 <Label className="text-xs font-medium text-(--color-muted)">Assign to</Label>
                 <Input
                   value={userSearchOpen ? userQuery : (selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName} (${selectedUser.email})` : "No Account Yet")}
@@ -386,17 +420,33 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
                   </div>
                 ) : null}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-(--color-muted)">Nickname</Label>
-                <Input value={orderNickname} onChange={(e) => setOrderNickname(e.target.value)}
-                  className="text-base w-44" placeholder="e.g. Spring Merch Drop" />
-              </div>
-            </>
-          ) : null}
+            ) : null}
+
+            {/* Notes — optional, expandable */}
+            <div>
+              {showNotes ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="customerNotes" className="text-xs font-medium text-(--color-muted)">Notes</Label>
+                    <button type="button" onClick={() => { setShowNotes(false); setCustomerNotes("") }}
+                      className="text-xs text-(--color-muted) hover:text-(--color-foreground) transition-colors motion-reduce:transition-none">
+                      Remove
+                    </button>
+                  </div>
+                  <Textarea id="customerNotes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)}
+                    rows={2} placeholder="Any additional notes…" className="resize-none" />
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowNotes(true)}
+                  className="text-sm text-(--color-muted) hover:text-(--color-foreground) transition-colors motion-reduce:transition-none">
+                  + Add notes
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          <Button type="submit" disabled={isPending} className="w-full gap-2">
+          <Button type="submit" disabled={isPending} className="gap-2 w-full">
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isPending ? "Submitting…" : "Submit Quote Request"}
           </Button>
@@ -409,6 +459,13 @@ export default function GetQuoteForm({ role, taxRate }: Props) {
         presets={lineItemPresets}
         isAdmin={isAdmin}
         onAdd={handleAddItem}
+      />
+
+      <ClaimModal
+        open={showClaimModal}
+        onOpenChange={setShowClaimModal}
+        redirectPath="/get-quote"
+        onSuccess={() => startTransition(doSubmit)}
       />
 
       {/* Add Setup Cost Dialog */}

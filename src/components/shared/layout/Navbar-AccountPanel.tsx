@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import dynamic from "next/dynamic"
+const ClaimModal = dynamic(() => import("@/components/shared/modals/ClaimModal"))
 
 interface Props {
   isOpen: boolean
@@ -25,6 +27,7 @@ export default function NavbarAccountPanel({ isOpen, onClose, navigate }: Props)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [showGuestModal, setShowGuestModal] = useState(false)
 
   const role = session?.user?.role
   const isStaff = role === "admin" || role === "employee"
@@ -245,9 +248,23 @@ export default function NavbarAccountPanel({ isOpen, onClose, navigate }: Props)
                 Forgot Password?
               </button>
             </div>
+            <div className="pt-1 border-t border-(--color-border) mt-3">
+              <button
+                type="button"
+                onClick={() => { onClose(); setShowGuestModal(true) }}
+                className="w-full py-2 text-sm text-(--color-muted) hover:text-(--color-foreground) transition-colors motion-reduce:transition-none touch-manipulation"
+              >
+                Continue as Guest
+              </button>
+            </div>
           </form>
         </div>
       )}
+      <ClaimModal
+        open={showGuestModal}
+        onOpenChange={setShowGuestModal}
+        redirectPath="/"
+      />
     </div>
   )
 }

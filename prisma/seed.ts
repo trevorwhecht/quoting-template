@@ -22,6 +22,9 @@ const SETTINGS = [
   { setting: "businessName",        value: projectConfig.businessName,               description: "Business display name" },
   { setting: "businessDescription", value: projectConfig.businessDescription,        description: "Short business description" },
   { setting: "currency",            value: projectConfig.currency,                   description: "Currency code" },
+  { setting: "employeeLineItemPriceAccess", value: "view", description: "Employee access to line item prices: none | view | edit" },
+  { setting: "employeeLineItemCostAccess",  value: "none", description: "Employee access to line item costs: none | view | edit" },
+  { setting: "employeeSetupCostAccess",     value: "edit", description: "Employee access to setup cost admin totals: none | view | edit" },
 ]
 
 const SETUP_FEE_PRESETS = [

@@ -1,7 +1,7 @@
 "use client"
 
 import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useRef, useTransition } from "react"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 export default function Register() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const claimToken = searchParams.get("claimToken")
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -60,6 +62,10 @@ export default function Register() {
         setError("Account created but sign-in failed — please sign in manually.")
         router.push("/login")
         return
+      }
+
+      if (claimToken) {
+        await fetch(`/api/orders/${claimToken}/claim`, { method: "POST" })
       }
 
       router.push("/account")

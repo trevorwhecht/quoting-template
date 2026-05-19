@@ -40,6 +40,33 @@ export const authOptions: NextAuthOptions = {
         }
       },
     }),
+    CredentialsProvider({
+      id: "guest",
+      name: "guest",
+      credentials: {
+        email: { label: "Email", type: "email" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email) return null
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            select: { id: true, email: true, firstName: true, lastName: true, role: true },
+          })
+          if (!user || user.role !== "guest") return null
+          return {
+            id: user.id,
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+          }
+        } catch {
+          return null
+        }
+      },
+    }),
   ],
   callbacks: {
     jwt({ token, user }) {

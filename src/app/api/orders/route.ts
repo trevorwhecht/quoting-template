@@ -23,7 +23,7 @@ export async function GET() {
   })
 
   const serialized = orders.map((o) => serializeOrder(o))
-  const data = role === "employee" ? serialized.map(stripAdminFields) : serialized
+  const data = role === "employee" ? serialized.map((o) => stripAdminFields(o)) : serialized
 
   return NextResponse.json({ data, error: null })
 }
@@ -38,11 +38,10 @@ export async function POST(req: Request) {
   const isStaff = role === "admin" || role === "employee"
   const isPublic = !session
 
-  // Staff-only fields — ignored for public submissions
   const body = await req.json()
-  const { customerNotes, notes, dueDate, isHardDeadline, lineItems = [] } = body
+  const { customerNotes, notes, dueDate, isHardDeadline, needsShipping, taxDeferralRequested, lineItems = [] } = body
   const userId = isStaff ? (body.userId || null) : null
-  const nickname = isStaff ? (body.nickname || null) : null
+  const nickname = body.nickname || null
   const stateId = isStaff ? (body.stateId ?? 1) : 1
 
   if (!Array.isArray(lineItems) || lineItems.length === 0) {
@@ -64,6 +63,8 @@ export async function POST(req: Request) {
       notes: isStaff ? (notes || null) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
       isHardDeadline: isHardDeadline ?? false,
+      needsShipping: needsShipping ?? false,
+      taxDeferralRequested: taxDeferralRequested ?? false,
       token: generateToken(),
       ...totals,
       createdBy: session?.user?.email ?? "anonymous",

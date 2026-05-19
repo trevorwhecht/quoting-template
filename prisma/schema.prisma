@@ -13,8 +13,10 @@ model User {
   password    String?
   firstName   String
   lastName    String
-  companyName String?
-  phone       String?
+  companyName               String?
+  resellerLicenseUrl        String?
+  resellerLicenseUploadedAt DateTime?
+  phone                     String?
   role        String   @default("user") // 'guest' | 'user' | 'employee' | 'admin'
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -92,8 +94,9 @@ model Order {
   dueDateEnd      DateTime?
   startDate       DateTime?
   isHardDeadline  Boolean   @default(false)
-  needsShipping   Boolean   @default(false)
-  mainImage       String?
+  needsShipping         Boolean   @default(false)
+  taxDeferralRequested  Boolean   @default(false)
+  mainImage             String?
   token           String?   @unique
   referredBy      String?
   completedDate   DateTime?

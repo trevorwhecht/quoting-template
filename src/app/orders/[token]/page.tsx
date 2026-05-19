@@ -82,6 +82,7 @@ export default async function OrderPublicPage({ params }: { params: Promise<{ to
             {order.state.name}
           </Badge>
           <OrdersActionButtons
+            orderId={order.id}
             totalDueNow={Number(order.totalPrice)}
             showDueNow={showDueNow}
             shareUrl={shareUrl}

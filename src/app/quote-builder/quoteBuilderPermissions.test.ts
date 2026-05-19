@@ -31,6 +31,44 @@ describe("getQuoteBuilderPermissions", () => {
       expect(p.canEditSetupCosts).toBe(false)
       expect(p.saveAction).toBe("none")
     })
+
+    it("employee with default permissions: can view prices, cannot edit prices, can edit setup costs", () => {
+      const perms = getQuoteBuilderPermissions({
+        role: "employee",
+        stateId: 1,
+        orderUserId: "u1",
+        sessionUserId: "e1",
+        employeePermissions: { lineItemPriceAccess: "view", lineItemCostAccess: "none", setupCostAccess: "edit" },
+      })
+      expect(perms.canViewLineItemPrices).toBe(true)
+      expect(perms.canEditLineItemPrices).toBe(false)
+      expect(perms.canEditSetupCosts).toBe(true)
+      expect(perms.canViewSetupCosts).toBe(true)
+    })
+
+    it("employee with price hidden: canViewLineItemPrices is false", () => {
+      const perms = getQuoteBuilderPermissions({
+        role: "employee",
+        stateId: 1,
+        orderUserId: null,
+        sessionUserId: "e1",
+        employeePermissions: { lineItemPriceAccess: "none", lineItemCostAccess: "none", setupCostAccess: "none" },
+      })
+      expect(perms.canViewLineItemPrices).toBe(false)
+      expect(perms.canViewSetupCosts).toBe(false)
+    })
+
+    it("employee with edit access: can edit prices and setup costs", () => {
+      const perms = getQuoteBuilderPermissions({
+        role: "employee",
+        stateId: 1,
+        orderUserId: null,
+        sessionUserId: "e1",
+        employeePermissions: { lineItemPriceAccess: "edit", lineItemCostAccess: "edit", setupCostAccess: "edit" },
+      })
+      expect(perms.canEditLineItemPrices).toBe(true)
+      expect(perms.canEditSetupCosts).toBe(true)
+    })
   })
 
   describe("user (owner)", () => {

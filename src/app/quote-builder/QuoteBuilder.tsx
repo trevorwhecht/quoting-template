@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { computeOrderTotals } from "@/services/orderService"
-import { getQuoteBuilderPermissions } from "./quoteBuilderPermissions"
+import { getQuoteBuilderPermissions, type EmployeeFieldPermissions } from "./quoteBuilderPermissions"
 import type { OrderDetail, SetupCostItem } from "@/models/order"
 import QuoteBuilderBanner from "./components/QuoteBuilder-Banner"
 import QuoteBuilderOrderItems from "./components/QuoteBuilder-OrderItems"
@@ -14,6 +14,8 @@ import QuoteBuilderOrderTotals from "./components/QuoteBuilder-OrderTotals"
 import QuoteBuilderUserSelect from "./components/QuoteBuilder-UserSelect"
 import QuoteBuilderPriceChangeDialog from "./components/QuoteBuilder-PriceChangeDialog"
 import { Button } from "@/components/ui/button"
+import dynamic from "next/dynamic"
+const ClaimModal = dynamic(() => import("@/components/shared/modals/ClaimModal"))
 
 export type DraftLineItem = {
   localId: string
@@ -38,6 +40,7 @@ type Props = {
   role: string
   taxRate: number
   sessionUserId: string | null
+  employeePermissions?: EmployeeFieldPermissions
 }
 
 function toDraftLineItem(li: OrderDetail["orderLineItems"][0]): DraftLineItem {
@@ -57,7 +60,7 @@ function toDraftSetupCost(sc: OrderDetail["setUpCosts"][0]): DraftSetupCost {
   }
 }
 
-export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUserId }: Props) {
+export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUserId, employeePermissions }: Props) {
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loading, setLoading] = useState(!!(orderId || token))
@@ -75,6 +78,7 @@ export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUse
   const [showPriceChangeDialog, setShowPriceChangeDialog] = useState(false)
   const [priceChangeDiff, setPriceChangeDiff] = useState<{ prev: number; next: number } | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [showClaimModal, setShowClaimModal] = useState(false)
 
   useEffect(() => {
     if (!orderId && !token) { setLoading(false); return }
@@ -103,6 +107,7 @@ export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUse
     stateId: order?.stateId ?? 1,
     orderUserId: order?.user?.id ?? null,
     sessionUserId,
+    employeePermissions,
   })
 
   const liveLineItems = draftLineItems.map((li) => ({ qty: li.qty, unitPrice: li.unitPrice, unitCost: li.unitCost }))
@@ -232,9 +237,18 @@ export default function QuoteBuilder({ orderId, token, role, taxRate, sessionUse
       {permissions.saveAction !== "none" ? (
         <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {permissions.saveAction === "login" ? (
-            <Button className="w-full" onClick={() => router.push("/login")}>
-              Sign In to Save
-            </Button>
+            <>
+              <Button className="w-full" onClick={() => setShowClaimModal(true)}>
+                Sign In to Save
+              </Button>
+              <ClaimModal
+                open={showClaimModal}
+                onOpenChange={setShowClaimModal}
+                orderId={order?.id}
+                redirectPath={token ? `/quote-builder?token=${token}` : "/quote-builder"}
+                onSuccess={() => startTransition(executeSave)}
+              />
+            </>
           ) : (
             <Button className="w-full gap-2" onClick={handleSaveClick} disabled={isPending}>
               {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

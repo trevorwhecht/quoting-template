@@ -1,4 +1,5 @@
 import type { TotalsInput, TotalsResult } from "@/models/order"
+import { prisma } from "@/lib/prisma"
 
 function round2(v: number): number {
   return Math.round(v * 100) / 100
@@ -52,17 +53,49 @@ export function serializeOrder(order: any): any {
   }
 }
 
+export type EmployeeFieldPermissions = {
+  lineItemPriceAccess: "none" | "view" | "edit"
+  lineItemCostAccess: "none" | "view" | "edit"
+  setupCostAccess: "none" | "view" | "edit"
+}
+
 // Removes admin-only fields for employee role responses.
+// Pass `perms` for employees to apply per-field access rules.
 // Call after serializeOrder().
-export function stripAdminFields(order: any): any {
+export function stripAdminFields(order: any, perms?: EmployeeFieldPermissions): any {
+  const hideCost = !perms || perms.lineItemCostAccess === "none"
+  const hideSetupCost = !perms || perms.setupCostAccess === "none"
+  // cost, profit, totalSetUpCost are always hidden for non-admin (order-level aggregates, not per-field)
   const { cost, profit, totalSetUpCost, ...rest } = order
   return {
     ...rest,
-    orderLineItems: rest.orderLineItems?.map(({ unitCost, ...li }: any) => ({
-      ...li,
-      variants: li.variants?.map(({ cost: _c, ...v }: any) => v) ?? [],
-    })) ?? [],
-    setUpCosts: rest.setUpCosts?.map(({ adminTotal, ...s }: any) => s) ?? [],
+    orderLineItems: rest.orderLineItems?.map((li: any) => {
+      const { unitCost, ...liRest } = li
+      return {
+        ...liRest,
+        ...(hideCost ? {} : { unitCost }),
+        variants: li.variants?.map(({ cost: _c, ...v }: any) => v) ?? [],
+      }
+    }) ?? [],
+    setUpCosts: rest.setUpCosts?.map((s: any) => {
+      const { adminTotal, ...sRest } = s
+      return hideSetupCost ? sRest : { ...sRest, adminTotal }
+    }) ?? [],
+  }
+}
+
+export async function getEmployeeFieldPermissions(): Promise<EmployeeFieldPermissions> {
+  const rows = await prisma.universalSettings.findMany({
+    where: {
+      setting: { in: ["employeeLineItemPriceAccess", "employeeLineItemCostAccess", "employeeSetupCostAccess"] },
+    },
+    select: { setting: true, value: true },
+  })
+  const map = Object.fromEntries(rows.map((r) => [r.setting, r.value]))
+  return {
+    lineItemPriceAccess: (map.employeeLineItemPriceAccess ?? "view") as EmployeeFieldPermissions["lineItemPriceAccess"],
+    lineItemCostAccess: (map.employeeLineItemCostAccess ?? "none") as EmployeeFieldPermissions["lineItemCostAccess"],
+    setupCostAccess: (map.employeeSetupCostAccess ?? "edit") as EmployeeFieldPermissions["setupCostAccess"],
   }
 }
 

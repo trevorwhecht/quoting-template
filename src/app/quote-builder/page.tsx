@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import QuoteBuilder from "./QuoteBuilder"
+import type { EmployeeFieldPermissions } from "@/services/orderService"
 
 export default async function QuoteBuilderPage({
   searchParams,
@@ -17,8 +18,22 @@ export default async function QuoteBuilderPage({
   // Non-staff accessing by orderId is not allowed
   if (orderIdStr && !isStaff) redirect("/login")
 
-  const taxSetting = await prisma.universalSettings.findUnique({ where: { setting: "taxRate" } })
-  const taxRate = taxSetting ? Number(taxSetting.value) : 0
+  const settingKeys = role === "employee"
+    ? ["taxRate", "employeeLineItemPriceAccess", "employeeLineItemCostAccess", "employeeSetupCostAccess"]
+    : ["taxRate"]
+  const settingRows = await prisma.universalSettings.findMany({
+    where: { setting: { in: settingKeys } },
+    select: { setting: true, value: true },
+  })
+  const settingsMap = Object.fromEntries(settingRows.map((r) => [r.setting, r.value]))
+  const taxRate = Number(settingsMap.taxRate ?? 0)
+  const employeePermissions: EmployeeFieldPermissions | undefined = role === "employee"
+    ? {
+        lineItemPriceAccess: (settingsMap.employeeLineItemPriceAccess ?? "view") as EmployeeFieldPermissions["lineItemPriceAccess"],
+        lineItemCostAccess: (settingsMap.employeeLineItemCostAccess ?? "none") as EmployeeFieldPermissions["lineItemCostAccess"],
+        setupCostAccess: (settingsMap.employeeSetupCostAccess ?? "edit") as EmployeeFieldPermissions["setupCostAccess"],
+      }
+    : undefined
 
   // Redirect logic for token-based access
   if (token) {
@@ -45,6 +60,7 @@ export default async function QuoteBuilderPage({
       role={role}
       taxRate={taxRate}
       sessionUserId={session?.user?.id ?? null}
+      employeePermissions={employeePermissions}
     />
   )
 }

@@ -1,21 +1,35 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { Share2 } from "lucide-react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+const ClaimModal = dynamic(() => import("@/components/shared/modals/ClaimModal"))
 
 type Props = {
+  orderId: number
   totalDueNow: number
   showDueNow: boolean
   shareUrl: string
 }
 
-export default function OrdersActionButtons({ totalDueNow, showDueNow, shareUrl }: Props) {
+export default function OrdersActionButtons({ orderId, totalDueNow, showDueNow, shareUrl }: Props) {
+  const { data: session } = useSession()
   const [dueNowOpen, setDueNowOpen] = useState(false)
+  const [claimOpen, setClaimOpen] = useState(false)
+
+  function handleDueNowClick() {
+    if (!session) {
+      setClaimOpen(true)
+    } else {
+      setDueNowOpen(true)
+    }
+  }
 
   function handleShare() {
     navigator.clipboard.writeText(shareUrl)
@@ -26,7 +40,7 @@ export default function OrdersActionButtons({ totalDueNow, showDueNow, shareUrl 
     <div className="flex items-center gap-2 shrink-0">
       {showDueNow ? (
         <>
-          <Button onClick={() => setDueNowOpen(true)}>
+          <Button onClick={handleDueNowClick}>
             Due Now ${totalDueNow.toFixed(2)}
           </Button>
           <Dialog open={dueNowOpen} onOpenChange={setDueNowOpen}>
@@ -42,6 +56,12 @@ export default function OrdersActionButtons({ totalDueNow, showDueNow, shareUrl 
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <ClaimModal
+            open={claimOpen}
+            onOpenChange={setClaimOpen}
+            orderId={orderId}
+            onSuccess={() => setDueNowOpen(true)}
+          />
         </>
       ) : null}
 

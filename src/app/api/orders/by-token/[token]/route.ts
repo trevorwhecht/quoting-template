@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { serializeOrder, stripAdminFields } from "@/services/orderService"
+import { serializeOrder, stripAdminFields, getEmployeeFieldPermissions } from "@/services/orderService"
 
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -23,7 +23,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   if (!order) return NextResponse.json({ data: null, error: "Not found" }, { status: 404 })
 
   const serialized = serializeOrder(order)
-  let data = role === "admin" ? serialized : stripAdminFields(serialized)
+  const perms = role === "employee" ? await getEmployeeFieldPermissions() : undefined
+  let data = role === "admin" ? serialized : stripAdminFields(serialized, perms)
   if (role !== "admin" && role !== "employee") {
     const { notes: _notes, ...rest } = data
     data = rest
