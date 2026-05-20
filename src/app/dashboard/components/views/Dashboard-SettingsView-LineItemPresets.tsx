@@ -1,95 +1,3 @@
-# Plan 5 — Line Item Presets UI + Admin Reseller/Tax Deferral Visibility
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** Add Line Item Preset management CRUD to the Settings view, and surface `taxDeferralRequested` + reseller license in the admin Order Sheet.
-
-**Architecture:** Line Item Presets follows the identical UI pattern of the existing `Dashboard-SettingsView-SetupFeePresets.tsx` — same table layout, same inline-edit row, same create/delete dialogs. Two small API gaps (GET `?all=1` and DELETE) are filled first. The Order Sheet changes are purely display-only: add two read-only fields to the admin Details tab by extending the `ORDER_DETAIL_INCLUDE` user select and the `OrderDetail` model type.
-
-**Tech Stack:** Next.js App Router · Prisma · Tailwind 4 · shadcn/ui · TypeScript · Vitest
-
----
-
-## File Map
-
-| File | Action | Task |
-|---|---|---|
-| `src/app/api/line-item-presets/route.ts` | Modify — add `?all=1` support to GET | 1 |
-| `src/app/api/line-item-presets/[id]/route.ts` | Modify — add DELETE handler | 1 |
-| `src/app/dashboard/components/views/Dashboard-SettingsView-LineItemPresets.tsx` | Create — CRUD table | 2 |
-| `src/app/dashboard/components/views/Dashboard-SettingsView.tsx` | Modify — import + render LineItemPresets | 2 |
-| `src/models/user.ts` | Modify — add reseller license fields to `UserSummary` | 3 |
-| `src/models/order.ts` | Modify — add `taxDeferralRequested` to `OrderDetail`; expand user Pick | 3 |
-| `src/app/api/orders/[id]/route.ts` | Modify — expand `ORDER_DETAIL_INCLUDE` user select | 3 |
-| `src/app/dashboard/components/orders/Dashboard-OrderSheet.tsx` | Modify — add tax deferral + reseller license to Details tab | 4 |
-
----
-
-## Task 1: Line Item Presets API — Fill Gaps
-
-**Files:**
-- Modify: `src/app/api/line-item-presets/route.ts`
-- Modify: `src/app/api/line-item-presets/[id]/route.ts`
-
-The GET endpoint currently only returns active presets — the admin UI needs all presets via `?all=1`. POST (create) and PATCH (update) already exist and are correct; only GET and DELETE need changes.
-
-- [ ] **Step 1: Add `?all=1` support to the GET handler**
-
-In `src/app/api/line-item-presets/route.ts`, replace the `GET` function:
-
-```ts
-export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-  const isAdmin = session?.user?.role === "admin"
-  const showAll = isAdmin && new URL(req.url).searchParams.get("all") === "1"
-
-  const presets = await prisma.lineItemPreset.findMany({
-    where: showAll ? undefined : { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  })
-  return NextResponse.json({ data: presets.map(serializePreset), error: null })
-}
-```
-
-- [ ] **Step 2: Add DELETE handler to `[id]/route.ts`**
-
-In `src/app/api/line-item-presets/[id]/route.ts`, add after the existing `PATCH` export:
-
-```ts
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions)
-  if (!session || session.user.role !== "admin") {
-    return NextResponse.json({ data: null, error: "Forbidden" }, { status: 403 })
-  }
-  const { id } = await params
-  await prisma.lineItemPreset.delete({ where: { id: Number(id) } })
-  return NextResponse.json({ data: { id: Number(id) }, error: null })
-}
-```
-
-- [ ] **Step 3: TypeScript check**
-
-```bash
-npx tsc --noEmit
-```
-
-Expected: zero errors.
-
----
-
-## Task 2: Line Item Presets Management UI
-
-**Files:**
-- Create: `src/app/dashboard/components/views/Dashboard-SettingsView-LineItemPresets.tsx`
-- Modify: `src/app/dashboard/components/views/Dashboard-SettingsView.tsx`
-
-Mirrors `Dashboard-SettingsView-SetupFeePresets.tsx` exactly in structure. Key differences: uses `defaultPrice` instead of `defaultRate`, no `unitLabel` field, uses `useTransition` (not boolean `saving` state).
-
-- [ ] **Step 1: Create `Dashboard-SettingsView-LineItemPresets.tsx`**
-
-Create `src/app/dashboard/components/views/Dashboard-SettingsView-LineItemPresets.tsx`:
-
-```tsx
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
@@ -328,13 +236,13 @@ export default function DashboardSettingsViewLineItemPresets() {
       </div>
 
       {/* Create Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={(v) => { if (!isPending) setShowCreateDialog(v) }}>
         <DialogContent className="bg-(--color-background)">
           <DialogHeader><DialogTitle>New Line Item Preset</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Name *</Label>
-              <Input value={createDraft.name}
+              <Input autoFocus value={createDraft.name}
                 onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
                 className="text-base" placeholder="e.g. Premium Hoodie" />
             </div>
@@ -364,11 +272,11 @@ export default function DashboardSettingsViewLineItemPresets() {
                   className="text-base" />
               </div>
             </div>
-          </div>
           <DialogFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button autoFocus onClick={handleCreate} disabled={isPending}>Create Preset</Button>
+            <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isPending}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>Create Preset</Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -396,178 +304,3 @@ export default function DashboardSettingsViewLineItemPresets() {
     </div>
   )
 }
-```
-
-- [ ] **Step 2: Wire into `Dashboard-SettingsView.tsx`**
-
-In `src/app/dashboard/components/views/Dashboard-SettingsView.tsx`, make two targeted edits:
-
-**Edit 1 — add the import** after the existing `DashboardSettingsViewSetupFeePresets` import line:
-
-```
-// Find this line:
-import DashboardSettingsViewSetupFeePresets from "./Dashboard-SettingsView-SetupFeePresets"
-
-// Add immediately after:
-import DashboardSettingsViewLineItemPresets from "./Dashboard-SettingsView-LineItemPresets"
-```
-
-**Edit 2 — insert the component** in the return. Find this exact block in the return:
-
-```tsx
-      <DashboardSettingsViewSetupFeePresets />
-```
-
-Replace with:
-
-```tsx
-      <DashboardSettingsViewLineItemPresets />
-      <DashboardSettingsViewSetupFeePresets />
-```
-
-Do not touch any other part of the file — the `useEffect`, `handleAccessChange`, and employee permissions table all stay exactly as they are.
-
-- [ ] **Step 3: TypeScript check**
-
-```bash
-npx tsc --noEmit
-```
-
-Expected: zero errors.
-
----
-
-## Task 3: Extend OrderDetail Type + API Include
-
-**Files:**
-- Modify: `src/models/user.ts`
-- Modify: `src/models/order.ts`
-- Modify: `src/app/api/orders/[id]/route.ts`
-
-The admin Order Sheet needs to display the customer's reseller license and whether they requested tax deferral. These fields exist in the DB but aren't included in `ORDER_DETAIL_INCLUDE` or the `OrderDetail` type.
-
-- [ ] **Step 1: Add reseller license fields to `UserSummary`**
-
-In `src/models/user.ts`, add two optional fields to `UserSummary`:
-
-```ts
-export type UserSummary = {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  companyName: string | null
-  phone: string | null
-  role: string
-  resellerLicenseUrl: string | null
-  resellerLicenseUploadedAt: string | null
-  createdAt: string
-}
-```
-
-- [ ] **Step 2: Update `OrderDetail` in `src/models/order.ts`**
-
-Add `taxDeferralRequested: boolean` to the `OrderDetail` type (after `needsShipping`):
-
-```ts
-needsShipping: boolean
-taxDeferralRequested: boolean
-mainImage: string | null
-```
-
-Expand the `user` Pick to include the reseller fields:
-
-```ts
-user: Pick<UserSummary, "id" | "firstName" | "lastName" | "email" | "phone" | "companyName" | "resellerLicenseUrl" | "resellerLicenseUploadedAt"> | null
-```
-
-- [ ] **Step 3: Update `ORDER_DETAIL_INCLUDE` in `src/app/api/orders/[id]/route.ts`**
-
-Find `ORDER_DETAIL_INCLUDE` at the top of the file and update the `user` select to include the reseller license fields:
-
-```ts
-const ORDER_DETAIL_INCLUDE = {
-  state: true,
-  user: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      phone: true,
-      companyName: true,
-      resellerLicenseUrl: true,
-      resellerLicenseUploadedAt: true,
-    },
-  },
-  orderLineItems: { include: { variants: true }, orderBy: { sortOrder: "asc" as const } },
-  setUpCosts: true,
-  payments: { orderBy: { paidAt: "desc" as const } },
-}
-```
-
-- [ ] **Step 4: TypeScript check**
-
-```bash
-npx tsc --noEmit
-```
-
-Expected: zero errors. Any new type errors here indicate a consumer that needs updating — fix them before proceeding.
-
----
-
-## Task 4: OrderSheet — Tax Deferral + Reseller License
-
-**Files:**
-- Modify: `src/app/dashboard/components/orders/Dashboard-OrderSheet.tsx`
-
-Add a compact info card to the admin Details tab showing whether the customer requested tax deferral and whether they have a reseller license on file.
-
-- [ ] **Step 1: Add the info card to the Details tab**
-
-In `src/app/dashboard/components/orders/Dashboard-OrderSheet.tsx`, inside the `{isAdmin ? (<>...</>) : null}` block at line 164, insert the following **after the `grid grid-cols-2 gap-3` div** (which contains Discount + Payment Plan) and **before the totals summary div**:
-
-```tsx
-{/* Tax deferral + reseller license */}
-<div className="rounded-md border border-(--color-border) p-3 space-y-2 text-sm bg-(--color-surface)">
-  <div className="flex justify-between items-center">
-    <span className="text-(--color-muted)">Tax Deferral Requested</span>
-    <span className={order.taxDeferralRequested ? "font-medium text-(--color-foreground)" : "text-(--color-muted)"}>
-      {order.taxDeferralRequested ? "Yes" : "No"}
-    </span>
-  </div>
-  {order.user ? (
-    <div className="flex justify-between items-center">
-      <span className="text-(--color-muted)">Reseller License</span>
-      {order.user.resellerLicenseUrl ? (
-        <a
-          href={order.user.resellerLicenseUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-(--color-primary) hover:underline text-xs"
-        >
-          View License
-        </a>
-      ) : (
-        <span className="text-(--color-muted)">None on file</span>
-      )}
-    </div>
-  ) : null}
-</div>
-```
-
-- [ ] **Step 2: TypeScript check**
-
-```bash
-npx tsc --noEmit
-```
-
-Expected: zero errors.
-
-- [ ] **Step 3: Run test suite**
-
-```bash
-npx vitest run
-```
-
-Expected: all tests pass (no regressions — none of these changes touch tested logic).

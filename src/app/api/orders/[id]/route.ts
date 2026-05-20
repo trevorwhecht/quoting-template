@@ -6,7 +6,18 @@ import { serializeOrder, stripAdminFields, computeOrderTotals, getEmployeeFieldP
 
 const ORDER_DETAIL_INCLUDE = {
   state: true,
-  user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, companyName: true } },
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      companyName: true,
+      resellerLicenseUrl: true,
+      resellerLicenseUploadedAt: true,
+    },
+  },
   orderLineItems: { include: { variants: true }, orderBy: { sortOrder: "asc" as const } },
   setUpCosts: true,
   payments: { orderBy: { paidAt: "desc" as const } },

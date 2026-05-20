@@ -82,7 +82,7 @@ export type OrderDetail = {
   nickname: string | null
   stateId: number
   state: OrderStateModel
-  user: Pick<UserSummary, "id" | "firstName" | "lastName" | "email" | "phone" | "companyName"> | null
+  user: Pick<UserSummary, "id" | "firstName" | "lastName" | "email" | "phone" | "companyName" | "resellerLicenseUrl" | "resellerLicenseUploadedAt"> | null
   customerNotes: string | null
   notes: string | null
   totalQty: number
@@ -108,6 +108,7 @@ export type OrderDetail = {
   startDate: string | null
   isHardDeadline: boolean
   needsShipping: boolean
+  taxDeferralRequested: boolean
   mainImage: string | null
   token: string | null
   completedDate: string | null

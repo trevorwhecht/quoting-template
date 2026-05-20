@@ -7,12 +7,19 @@ export function serializePreset(p: any) {
   return { ...p, defaultPrice: Number(p.defaultPrice), defaultCost: Number(p.defaultCost) }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const session = await getServerSession(authOptions)
+  const isAdmin = session?.user?.role === "admin"
+  const showAll = isAdmin && new URL(req.url).searchParams.get("all") === "1"
+
   const presets = await prisma.lineItemPreset.findMany({
-    where: { isActive: true },
+    where: showAll ? undefined : { isActive: true },
     orderBy: { sortOrder: "asc" },
   })
-  return NextResponse.json({ data: presets.map(serializePreset), error: null })
+  const serialized = presets.map(serializePreset)
+  // Strip internal cost from public (unauthenticated) responses
+  const data = isAdmin ? serialized : serialized.map(({ defaultCost: _c, ...p }) => p)
+  return NextResponse.json({ data, error: null })
 }
 
 export async function POST(req: Request) {

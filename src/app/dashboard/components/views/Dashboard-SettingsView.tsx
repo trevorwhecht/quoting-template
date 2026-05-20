@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import DashboardSettingsViewSetupFeePresets from "./Dashboard-SettingsView-SetupFeePresets"
+import DashboardSettingsViewLineItemPresets from "./Dashboard-SettingsView-LineItemPresets"
 
 type Access = "none" | "view" | "edit"
 
@@ -60,6 +61,7 @@ export default function DashboardSettingsView() {
   return (
     <div className="p-6 max-w-4xl space-y-10">
       <h2 className="text-xl font-semibold text-(--color-foreground)">Settings</h2>
+      <DashboardSettingsViewLineItemPresets />
       <DashboardSettingsViewSetupFeePresets />
 
       <div className="space-y-4">

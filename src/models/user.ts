@@ -6,5 +6,7 @@ export type UserSummary = {
   companyName: string | null
   phone: string | null
   role: string
+  resellerLicenseUrl: string | null
+  resellerLicenseUploadedAt: string | null
   createdAt: string
 }

@@ -67,7 +67,7 @@ export default function DashboardOrderSheet({ order, open, onOpenChange, onOrder
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[600px] h-dvh overflow-y-auto flex flex-col p-0">
+      <SheetContent className="w-full sm:max-w-[600px] h-dvh overflow-y-auto flex flex-col p-0 bg-(--color-background)">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-(--color-border) shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -195,6 +195,33 @@ export default function DashboardOrderSheet({ order, open, onOpenChange, onOrder
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Tax deferral + reseller license */}
+                <div className="rounded-md border border-(--color-border) p-3 space-y-2 text-sm bg-(--color-surface)">
+                  <div className="flex justify-between items-center">
+                    <span className="text-(--color-muted)">Tax Deferral Requested</span>
+                    <span className={order.taxDeferralRequested ? "font-medium text-(--color-foreground)" : "text-(--color-muted)"}>
+                      {order.taxDeferralRequested ? "Yes" : "No"}
+                    </span>
+                  </div>
+                  {order.user ? (
+                    <div className="flex justify-between items-center">
+                      <span className="text-(--color-muted)">Reseller License</span>
+                      {order.user.resellerLicenseUrl ? (
+                        <a
+                          href={order.user.resellerLicenseUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-(--color-primary) hover:underline text-xs"
+                        >
+                          View License
+                        </a>
+                      ) : (
+                        <span className="text-(--color-muted)">None on file</span>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Totals summary */}
