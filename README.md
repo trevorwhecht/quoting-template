@@ -39,13 +39,11 @@ Update the project name in three places:
 }
 ```
 
-**`CLAUDE.md`** — update the top line and description:
+**`CLAUDE.md`** — update the first heading and one-line description at the top of the file:
 ```md
----
-description: your-project-name — one line description of what this project does
----
-
 # your-project-name
+
+One line description of what this project does.
 ```
 
 **`next.config.ts`** — update any hardcoded references if present.
@@ -78,18 +76,21 @@ npm install
 
 Copy the env template and fill in your values:
 ```bash
-cp .env .env.local
+cp .env.example .env.local
 ```
 
 Open `.env.local` and fill in:
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string (local dev DB) |
+| `DATABASE_URL` | PostgreSQL connection string — **each project needs its own dedicated database** (see note below) |
 | `NEXTAUTH_SECRET` | Random secret — run `openssl rand -base64 32` to generate |
 | `NEXTAUTH_URL` | `http://localhost:3000` for local dev |
+| `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` for local dev — used for order share links |
 | `SEED_ADMIN_EMAIL` | Email for the seeded admin user |
 | `SEED_ADMIN_PASSWORD` | Password for the seeded admin user |
+
+> **Each forked project must have its own dedicated Prisma/PostgreSQL database.** Projects share the same Prisma account but each gets a separate database — schemas, migrations, and data must never be shared across projects. Create a new database in your Prisma dashboard before running migrations.
 
 For production, create `.env.prod` with your production `DATABASE_URL` and set all vars in Vercel's environment settings.
 
